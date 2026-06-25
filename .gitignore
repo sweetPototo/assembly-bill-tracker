@@ -1,0 +1,27 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# 환경 변수 (절대 커밋 금지)
+.env
+.env.local
+.env*.local
+scrapers/.env
+
+# Google 인증 (절대 커밋 금지)
+scrapers/config/credentials.json
+scrapers/config/token.json
+
+# 크롤러 생성 파일
+scrapers/output_pdfs/
+
+# Next.js
+.next/
+node_modules/
+out/
+tsconfig.tsbuildinfo
+
+# 기타
+.DS_Store

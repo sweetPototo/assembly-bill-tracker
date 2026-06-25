@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 스크롤바 레이아웃 예약 — 데스크탑 전용 (모바일에 적용 시 터치 이벤트 간섭) */
+@media (min-width: 768px) {
+  html {
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+  }
+}
+
+/* 버튼/링크 탭 딜레이 제거 — 브라우저가 이중탭 확대를 기다리지 않도록 */
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
+@layer utilities {
+  /* 스크롤바 숨기기 — 가로 스크롤 UI에서 scrollbar가 보이지 않도록 */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
