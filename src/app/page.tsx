@@ -9,7 +9,7 @@ async function fetchTimelineData(): Promise<TimelineArticle[]> {
   )
   const today = new Date()
   const from  = new Date(today)
-  from.setDate(from.getDate() - 6)
+  from.setDate(from.getDate() - 27)
 
   const { data } = await supabase
     .from('articles')
@@ -23,7 +23,7 @@ async function fetchTimelineData(): Promise<TimelineArticle[]> {
 export default async function HomePage() {
   const articles = await fetchTimelineData()
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="min-h-screen bg-white">
       <TopNav />
       <div className="pt-[100px]">
         <KeywordTimeline articles={articles} />

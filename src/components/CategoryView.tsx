@@ -52,7 +52,7 @@ export default function CategoryView({ initialArticles, category }: Props) {
   return (
     <>
       {/* fixed: iOS Safari의 sticky+touch 좌표 버그 회피 */}
-      <div className="fixed left-0 right-0 top-[100px] z-[60] bg-slate-950 border-b border-slate-800">
+      <div className="fixed left-0 right-0 top-[100px] z-[60] bg-white border-b border-slate-200">
         <WeeklyDatePicker selectedDate={selectedDate} onDateChange={handleDateChange} />
       </div>
 
@@ -60,8 +60,8 @@ export default function CategoryView({ initialArticles, category }: Props) {
       <main className="max-w-6xl mx-auto px-4 pt-[68px] pb-6">
 
         <div className="mb-5">
-          <h1 className="text-lg font-bold text-slate-100">{dateLabel}</h1>
-          <p className="text-sm text-slate-400 mt-0.5">
+          <h1 className="text-lg font-bold text-slate-900">{dateLabel}</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
             {loading ? '불러오는 중…' : `${articles.length}건의 기사`}
           </p>
         </div>
@@ -69,7 +69,7 @@ export default function CategoryView({ initialArticles, category }: Props) {
         {loading && (
           <div className="flex flex-col gap-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 h-16 animate-pulse" />
+              <div key={i} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 h-16 animate-pulse" />
             ))}
           </div>
         )}

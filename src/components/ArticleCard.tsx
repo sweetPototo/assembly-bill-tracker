@@ -21,11 +21,11 @@ export default function ArticleCard({ article }: ArticleCardProps) {
 
   return (
     <Link href={`/article/${article.id}`} className="block">
-      <article className="flex flex-col gap-2.5 bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3.5 hover:border-slate-600 hover:bg-slate-800/60 active:scale-[0.99] transition-all cursor-pointer">
+      <article className="flex flex-col gap-2.5 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 hover:border-slate-600 hover:bg-slate-100/60 active:scale-[0.99] transition-all cursor-pointer">
 
         {/* 헤더: 언론사 + 카테고리 + 시간 */}
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-300 bg-slate-800 px-2 py-0.5 rounded-md">
+          <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
             {article.publisher}
           </span>
           {style && (
@@ -37,7 +37,7 @@ export default function ArticleCard({ article }: ArticleCardProps) {
         </div>
 
         {/* 기사 제목 */}
-        <h2 className="text-[15px] font-bold text-slate-100 leading-snug line-clamp-2">
+        <h2 className="text-[15px] font-bold text-slate-900 leading-snug line-clamp-2">
           {article.title}
         </h2>
 

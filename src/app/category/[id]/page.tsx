@@ -35,7 +35,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ id: s
   const articles = await fetchTodayArticles(category)
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="min-h-screen bg-white">
       <TopNav />
       <div className="pt-[100px]">
         <CategoryView initialArticles={articles} category={category} />

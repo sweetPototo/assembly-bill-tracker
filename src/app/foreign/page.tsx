@@ -28,7 +28,7 @@ export default async function ForeignPage() {
   const articles = await fetchTodayForeignArticles()
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="min-h-screen bg-white">
       <TopNav />
       <div className="pt-[100px]">
         <ForeignView initialArticles={articles} />

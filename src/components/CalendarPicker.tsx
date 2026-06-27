@@ -101,24 +101,24 @@ export default function CalendarPicker({ selectedDate, onDateChange, onClose }: 
     // 패널: 달력 버튼 기준 오른쪽 아래에 absolute 위치
     <div
       ref={panelRef}
-      className="absolute right-0 top-full mt-2 z-50 w-72 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl shadow-black/60 p-4"
+      className="absolute right-0 top-full mt-2 z-50 w-72 bg-slate-50 border border-slate-200 rounded-2xl shadow-2xl shadow-black/60 p-4"
     >
       {/* 월 네비게이션 */}
       <div className="flex items-center justify-between mb-3">
         <button
           onClick={() => setViewMonth(v => new Date(v.getFullYear(), v.getMonth() - 1, 1))}
-          className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <span className="text-sm font-semibold text-slate-100">
+        <span className="text-sm font-semibold text-slate-900">
           {year}년 {MONTH_NAMES[month]}
           {ready && fetching && <span className="ml-2 text-xs text-slate-500">…</span>}
         </span>
         <button
           onClick={() => setViewMonth(v => new Date(v.getFullYear(), v.getMonth() + 1, 1))}
           disabled={!canGoNextMonth}
-          className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+          className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -157,9 +157,9 @@ export default function CalendarPicker({ selectedDate, onDateChange, onClose }: 
                   onClick={() => { onDateChange(midnight(day)); onClose() }}
                   className={[
                     'flex items-center justify-center h-8 w-full rounded-lg text-sm font-medium transition-colors',
-                    isSelected   ? 'bg-blue-600 text-white'                              : '',
-                    !isSelected && isToday ? 'text-blue-400 ring-1 ring-blue-500/40'    : '',
-                    !isSelected && !isToday && !isDisabled ? 'text-slate-300 hover:bg-slate-800' : '',
+                    isSelected   ? 'bg-blue-400 text-white'                                  : '',
+                    !isSelected && isToday ? 'text-blue-600 ring-1 ring-blue-500/40'    : '',
+                    !isSelected && !isToday && !isDisabled ? 'text-slate-700 hover:bg-slate-100' : '',
                     isDisabled   ? 'text-slate-700 cursor-not-allowed'                   : '',
                   ].join(' ')}
                 >

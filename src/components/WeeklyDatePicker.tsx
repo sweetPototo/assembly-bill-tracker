@@ -56,7 +56,7 @@ export default function WeeklyDatePicker({ selectedDate, onDateChange }: WeeklyD
       <button
         onClick={() => shiftDay(-1)}
         aria-label="이전 날짜"
-        className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+        className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
       >
         <ChevronLeft className="w-5 h-5" />
       </button>
@@ -73,10 +73,10 @@ export default function WeeklyDatePicker({ selectedDate, onDateChange }: WeeklyD
               onClick={() => onDateChange(toUTCMidnight(day))}
               className={`flex flex-col items-center justify-center w-9 h-12 sm:w-11 sm:h-14 rounded-xl transition-all ${
                 isSelected
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
+                  ? 'bg-blue-400 text-white shadow-lg shadow-blue-400/25'
                   : isToday
-                  ? 'bg-slate-800 text-blue-400 ring-1 ring-blue-500/40'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  ? 'bg-slate-100 text-blue-600 ring-1 ring-blue-500/40'
+                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
               }`}
             >
               {/* getUTCDay/Date 사용 → 서버·클라이언트 렌더 내용 동일 */}
@@ -96,7 +96,7 @@ export default function WeeklyDatePicker({ selectedDate, onDateChange }: WeeklyD
         onClick={() => shiftDay(1)}
         disabled={isSameDay(selectedDate, today)}
         aria-label="다음 날짜"
-        className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+        className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
       >
         <ChevronRight className="w-5 h-5" />
       </button>
@@ -108,8 +108,8 @@ export default function WeeklyDatePicker({ selectedDate, onDateChange }: WeeklyD
           aria-label="달력으로 날짜 선택"
           className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
             calendarOpen
-              ? 'bg-slate-700 text-slate-100'
-              : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800'
+              ? 'bg-slate-700 text-slate-900'
+              : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
           <CalendarDays className="w-5 h-5" />

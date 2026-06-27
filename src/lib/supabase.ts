@@ -12,7 +12,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 export interface Article {
   id: string
   title: string
-  summary: string        // "• 사실1\n• 사실2\n• 사실3" 형식
+  summary: string        // "• Fact\n• Detail\n• Background\n• Insight" 형식
   publisher: string
   published_at: string   // ISO 8601 타임스탬프
   origin_url: string
@@ -20,6 +20,7 @@ export interface Article {
   category: number       // 0:정치 1:경제 2:사회 3:세계
   isforeign: number      // 0:국내 1:외신
   keywords: string[]     // 형태소 분석으로 추출한 명사 키워드
+  reporter: string | null
   created_at: string
 }
 
@@ -40,8 +41,8 @@ export type CategoryId = (typeof CATEGORIES)[number]['id']
 
 // 카테고리별 색상 스타일 맵 — 자바의 Map<Integer, CategoryStyle> 와 동일
 export const CATEGORY_STYLE: Record<number, { badge: string; dot: string }> = {
-  0: { badge: 'bg-red-900/40 text-red-400 border border-red-800',            dot: 'bg-red-400' },
-  1: { badge: 'bg-emerald-900/40 text-emerald-400 border border-emerald-800', dot: 'bg-emerald-400' },
-  2: { badge: 'bg-amber-900/40 text-amber-400 border border-amber-800',       dot: 'bg-amber-400' },
-  3: { badge: 'bg-violet-900/40 text-violet-400 border border-violet-800',    dot: 'bg-violet-400' },
+  0: { badge: 'bg-red-50 text-red-600 border border-red-200',            dot: 'bg-red-500' },
+  1: { badge: 'bg-emerald-50 text-emerald-600 border border-emerald-200', dot: 'bg-emerald-500' },
+  2: { badge: 'bg-amber-50 text-amber-600 border border-amber-200',       dot: 'bg-amber-500' },
+  3: { badge: 'bg-violet-50 text-violet-600 border border-violet-200',    dot: 'bg-violet-500' },
 }

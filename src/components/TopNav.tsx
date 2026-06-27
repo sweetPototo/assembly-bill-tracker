@@ -21,17 +21,17 @@ export default function TopNav() {
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-slate-950 border-b border-slate-800">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200">
       <div className="max-w-6xl mx-auto px-4">
 
         <div className="flex items-center justify-between h-[48px]">
           <Link
             href="/"
-            className="text-blue-400 font-extrabold text-xl tracking-tight hover:text-blue-300 transition-colors"
+            className="text-blue-600 font-extrabold text-xl tracking-tight hover:text-blue-500 transition-colors"
           >
-            3줄 신문
+            짧은 신문
           </Link>
-          <button aria-label="마이페이지" className="text-slate-400 hover:text-slate-100 transition-colors">
+          <button aria-label="마이페이지" className="text-slate-500 hover:text-slate-900 transition-colors">
             <UserCircle className="w-6 h-6" />
           </button>
         </div>
@@ -43,14 +43,14 @@ export default function TopNav() {
               href={categoryHref(cat.id)}
               className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
                 isActive(cat.id)
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  ? 'bg-blue-400 text-white shadow-md shadow-blue-400/30'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
               }`}
             >
               {cat.label}
             </Link>
           ))}
-          <button className="flex-shrink-0 ml-auto px-4 py-1.5 text-sm font-semibold text-slate-400 hover:text-slate-200 transition-colors">
+          <button className="flex-shrink-0 ml-auto px-4 py-1.5 text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors">
             마이페이지
           </button>
         </nav>

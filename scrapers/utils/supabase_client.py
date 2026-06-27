@@ -68,12 +68,15 @@ def save_article(article: dict) -> bool:
     article 딕셔너리 필수 키:
       - url          → origin_url
       - title        → title
-      - summary      → summary
+      - summary      → summary         (list[str], 4개 문장 배열)
+      - keywords     → keywords        (list[str], 맥락 키워드 배열)
       - media_name   → publisher
-      - published_at → published_at (ISO 8601 문자열, 없으면 현재 UTC 시각 사용)
+      - published_at → published_at    (ISO 8601 문자열, 없으면 현재 UTC 시각 사용)
     """
-    from datetime import datetime, timezone
-    published_at = article.get("published_at") or datetime.now(timezone.utc).isoformat()
+    published_at = article.get("published_at")
+    if not published_at:
+        print(f"  [건너뜀] published_at 없음: {article.get('url', '')[:60]}")
+        return False
 
     data = {
         "title": article["title"],
@@ -84,6 +87,7 @@ def save_article(article: dict) -> bool:
         "category": article["category"],
         "isforeign": article["isforeign"],
         "keywords": article.get("keywords", []),
+        "reporter": article.get("reporter"),
     }
 
     try:

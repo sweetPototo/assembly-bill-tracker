@@ -38,7 +38,7 @@ export default async function ArticleDetailPage({
   if (!article) notFound()
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="min-h-screen bg-white text-slate-900">
       <TopNav />
       <ArticleDetail article={article} initialComments={comments} />
     </div>

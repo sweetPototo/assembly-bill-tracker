@@ -14,9 +14,6 @@ scrapers/.env
 scrapers/config/credentials.json
 scrapers/config/token.json
 
-# 크롤러 생성 파일
-scrapers/output_pdfs/
-
 # Next.js
 .next/
 node_modules/

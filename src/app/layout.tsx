@@ -7,12 +7,11 @@ const inter = Inter({ subsets: ['latin'] })
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
 }
 
 export const metadata: Metadata = {
-  title: '3줄 신문',
-  description: '바쁜 일상 속 우리의 권리를 지키는 3줄 시국 뉴스',
+  title: '짧은 신문',
+  description: '바쁜 일상 속 우리의 권리를 지키는 짧은 시국 뉴스',
   icons: {
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' font-weight='bold' fill='%2360a5fa'>3</text></svg>",
   },
@@ -23,7 +22,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body className={`${inter.className} antialiased bg-slate-950 text-slate-100 min-h-screen`}>
+      <body className={`${inter.className} antialiased bg-white text-slate-900 min-h-screen`}>
         {children}
       </body>
     </html>
