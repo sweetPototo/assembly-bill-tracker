@@ -10,27 +10,19 @@
   pip install requests beautifulsoup4 openai python-dotenv supabase
 """
 
-import os
-import json
 import requests
 from bs4 import BeautifulSoup
-from openai import OpenAI
 from dotenv import load_dotenv
 from rss_collector import collect_urls_from_rss, RSS_FEED_URLS, collect_bbc_urls, BBC_RSS_FEEDS
 from utils.google_drive import save_and_upload
 from utils.supabase_client import save_article, get_existing_urls
+from utils.ai_client import call_openai, DOMESTIC_NEWS, FOREIGN_NEWS
 
 load_dotenv()  # .env 파일을 읽어서 환경변수로 등록
 
 # ==============================================================================
 # [설정 영역] 자바의 static final 상수 / application.properties 역할
 # ==============================================================================
-
-# OpenAI API 키
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "YOUR_API_KEY_HERE")
-
-# 사용할 GPT 모델
-OPENAI_MODEL = "gpt-4o"
 
 # 규칙 기반 필터링에 사용할 핵심 키워드 목록
 FILTER_KEYWORDS = [
@@ -229,170 +221,6 @@ def filter_by_keywords_bbc(article: dict, keywords: list) -> bool:
 
 
 # ==============================================================================
-# [3단계] AI 분석 함수 — 요약 + 키워드를 1회 호출로 처리
-# ==============================================================================
-
-def analyze_news_with_openai(title: str, content: str) -> dict | None:
-    """
-    국내 뉴스 기사를 OpenAI API로 분석합니다.
-    4줄 인사이트 요약과 맥락 키워드를 단일 API 호출로 반환합니다.
-
-    Returns:
-        {
-            "summary": ["Fact 문장", "Detail 문장", "Background 문장", "Insight 문장"],
-            "context_keywords": ["키워드1", "키워드2"]
-        }
-        실패 시 None 반환
-    """
-    if OPENAI_API_KEY == "YOUR_API_KEY_HERE":
-        print("  [건너뜀] OPENAI_API_KEY가 설정되지 않았습니다.")
-        return None
-
-    print("  [AI 분석] GPT 요청 중...")
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    content_snippet = content[:3000]
-
-    try:
-        response = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "당신은 대한민국 정치·사회 뉴스를 정밀 분석하는 팩트체크 전문 AI입니다.\n"
-                        "반드시 원본 기사에 명시된 객관적 사실만 사용하십시오.\n"
-                        "'심각한', '충격적인' 같은 주관적·감정적 형용사는 절대 사용하지 마십시오.\n\n"
-                        "[태스크 1 - 4줄 인사이트 요약]\n"
-                        "Fact(핵심 사건), Detail(수치·발언), Background(배경·맥락), Insight(파급효과) "
-                        "구조에 맞춰 정확히 4개의 한국어 문장 리스트를 생성하십시오.\n\n"
-                        "[태스크 2 - 분류 키워드 도출]\n"
-                        "기사의 핵심 주제를 대표하는 키워드 1~2개를 도출하십시오.\n"
-                        "허용 기준: 언론사 섹션명 또는 학술 데이터베이스 색인어로 사용 가능한 "
-                        "정제된 단독 명사형 단어만 허용합니다.\n"
-                        "금지 기준: '이해상충', '권력남용', '정치보복'처럼 "
-                        "비유적 표현·관용어·동사성 합성어는 절대 사용하지 마십시오.\n"
-                        "예시: '탄핵', '대선', '한미관계', '반도체', '국회', '검찰', '부동산', '안보'\n\n"
-                        "반드시 아래 JSON 형식으로만 출력하십시오:\n"
-                        '{"summary": ["Fact 문장", "Detail 문장", "Background 문장", "Insight 문장"], '
-                        '"context_keywords": ["키워드1", "키워드2"]}'
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"다음 기사를 분석해 주세요.\n\n"
-                        f"제목: {title}\n\n"
-                        f"본문:\n{content_snippet}"
-                    ),
-                },
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.0,
-        )
-
-        result = json.loads(response.choices[0].message.content)
-
-        if not isinstance(result.get("summary"), list) or len(result["summary"]) != 4:
-            print("  [오류] summary가 4개 항목 리스트가 아닙니다.")
-            return None
-        if not isinstance(result.get("context_keywords"), list) or not result["context_keywords"]:
-            print("  [오류] context_keywords가 올바른 리스트가 아닙니다.")
-            return None
-
-        return result
-
-    except json.JSONDecodeError as e:
-        print(f"  [오류] JSON 파싱 실패: {e}")
-        return None
-    except Exception as e:
-        print(f"  [오류] OpenAI API 호출 실패: {e}")
-        return None
-
-
-def analyze_bbc_with_openai(title: str, content: str) -> dict | None:
-    """
-    BBC 외신 기사를 OpenAI API로 분석합니다.
-    제목 한국어 번역 + 4줄 인사이트 요약 + 맥락 키워드를 단일 API 호출로 반환합니다.
-
-    Returns:
-        {
-            "title_ko": "번역된 한국어 제목",
-            "summary": ["Fact 문장", "Detail 문장", "Background 문장", "Insight 문장"],
-            "context_keywords": ["키워드1", "키워드2"]
-        }
-        실패 시 None 반환
-    """
-    if OPENAI_API_KEY == "YOUR_API_KEY_HERE":
-        print("  [건너뜀] OPENAI_API_KEY가 설정되지 않았습니다.")
-        return None
-
-    print("  [AI 분석+번역] BBC 외신 GPT 요청 중...")
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    content_snippet = content[:3000]
-
-    try:
-        response = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "당신은 국제정치학 전문 팩트체크 AI입니다.\n"
-                        "원본 기사의 객관적 사실만 사용하고 주관적·감정적 형용사는 절대 금지합니다.\n"
-                        "현장 묘사나 지엽적 인터뷰는 제외하고 핵심 팩트·갈등 원인·지정학적 영향에 집중하십시오.\n\n"
-                        "[태스크 1 - 제목 번역]\n"
-                        "영문 제목을 자연스러운 한국어로 번역하십시오.\n\n"
-                        "[태스크 2 - 4줄 인사이트 요약]\n"
-                        "Fact(핵심 사건), Detail(수치·발언), Background(배경·맥락), Insight(지정학적 파급효과) "
-                        "구조에 맞춰 정확히 4개의 한국어 문장 리스트를 생성하십시오.\n\n"
-                        "[태스크 3 - 분류 키워드 도출]\n"
-                        "기사의 핵심 주제를 대표하는 키워드 1~2개를 도출하십시오.\n"
-                        "허용 기준: 언론사 섹션명 또는 학술 데이터베이스 색인어로 사용 가능한 "
-                        "정제된 단독 명사형 단어만 허용합니다.\n"
-                        "금지 기준: 비유적 표현·관용어·동사성 합성어는 절대 사용하지 마십시오.\n"
-                        "예시: '미중관계', '반도체', '핵억제', '대만해협', '인도태평양', '경제제재', '군사동맹'\n\n"
-                        "반드시 아래 JSON 형식으로만 출력하십시오:\n"
-                        '{"title_ko": "번역된 한국어 제목", '
-                        '"summary": ["Fact 문장", "Detail 문장", "Background 문장", "Insight 문장"], '
-                        '"context_keywords": ["키워드1", "키워드2"]}'
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"다음 BBC 기사를 분석해 주세요.\n\n"
-                        f"제목: {title}\n\n"
-                        f"본문:\n{content_snippet}"
-                    ),
-                },
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.0,
-        )
-
-        result = json.loads(response.choices[0].message.content)
-
-        if not isinstance(result.get("title_ko"), str) or not result["title_ko"]:
-            print("  [오류] title_ko가 올바른 문자열이 아닙니다.")
-            return None
-        if not isinstance(result.get("summary"), list) or len(result["summary"]) != 4:
-            print("  [오류] summary가 4개 항목 리스트가 아닙니다.")
-            return None
-        if not isinstance(result.get("context_keywords"), list) or not result["context_keywords"]:
-            print("  [오류] context_keywords가 올바른 리스트가 아닙니다.")
-            return None
-
-        return result
-
-    except json.JSONDecodeError as e:
-        print(f"  [오류] JSON 파싱 실패: {e}")
-        return None
-    except Exception as e:
-        print(f"  [오류] OpenAI API 호출 실패: {e}")
-        return None
-
-
-# ==============================================================================
 # [결과 출력] 자바의 ResultPrinter.print(article) 역할
 # ==============================================================================
 
@@ -456,7 +284,7 @@ def run_pipeline(urls: list, limit: int | None = None) -> list:
             break
 
         # --- Step 4: AI 분석 (요약 + 키워드 1회 호출) ---
-        analysis = analyze_news_with_openai(article["title"], article["content"])
+        analysis = call_openai(article["title"], article["content"], DOMESTIC_NEWS)
         if analysis is None:
             print("  → AI 분석 실패, 다음 URL로 넘어갑니다.")
             continue
@@ -526,7 +354,7 @@ def run_bbc_pipeline(urls: list, limit: int | None = None) -> list:
             break
 
         # --- Step 4: AI 분석 (번역 + 요약 + 키워드 1회 호출) ---
-        analysis = analyze_bbc_with_openai(article["title"], article["content"])
+        analysis = call_openai(article["title"], article["content"], FOREIGN_NEWS)
         if analysis is None:
             print("  → AI 분석 실패, 건너뜁니다.")
             continue
