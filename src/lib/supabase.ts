@@ -25,6 +25,33 @@ export interface Article {
 }
 
 // =========================================================
+// 국회 법률안 타입
+// =========================================================
+export interface Bill {
+  bill_id:      string
+  bill_no:      string
+  bill_name:    string
+  committee:    string | null
+  propose_dt:   string | null
+  rst_proposer: string | null
+  status:       string | null
+  ai_reason:    string | null
+}
+
+export const BILL_PAGE_SIZE = 10
+
+export async function fetchBills(from: number): Promise<Bill[]> {
+  const { data, error } = await supabase
+    .from('bills')
+    .select('bill_id, bill_no, bill_name, committee, propose_dt, rst_proposer, status, ai_reason')
+    .order('propose_dt', { ascending: false, nullsFirst: false })
+    .order('bill_id',    { ascending: false })
+    .range(from, from + BILL_PAGE_SIZE - 1)
+  if (error) throw error
+  return data ?? []
+}
+
+// =========================================================
 // 카테고리 메타데이터 — 자바의 enum Category { 정치, 경제, ... }와 유사
 // id: -1이면 '홈(전체)' 탭
 // =========================================================

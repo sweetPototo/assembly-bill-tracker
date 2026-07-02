@@ -115,10 +115,15 @@ FINAL_BILL_STATUSES = {"가결", "부결", "철회", "공포", "폐기"}
 
 
 def _to_date(s: str) -> str | None:
-    """'YYYYMMDD' → 'YYYY-MM-DD'. 빈 값이면 None 반환."""
+    """날짜 문자열을 'YYYY-MM-DD'로 정규화. 빈 값이면 None 반환.
+    - 'YYYYMMDD'   (8자리 숫자) → 'YYYY-MM-DD'
+    - 'YYYY-MM-DD' (이미 ISO)  → 그대로 반환
+    """
     s = (s or "").strip()
     if len(s) == 8 and s.isdigit():
         return f"{s[:4]}-{s[4:6]}-{s[6:]}"
+    if len(s) == 10 and s[4] == "-" and s[7] == "-":
+        return s
     return None
 
 
@@ -219,14 +224,17 @@ def save_bill(bill: dict) -> bool:
 
 
 def update_bill_status(bill_id: str, detail: dict) -> bool:
-    """3차 API 결과로 상태 관련 필드만 갱신합니다. AI 재실행 없음."""
+    """3차 API 결과로 진행 상태 및 위원회 관련 필드를 갱신합니다. AI 재실행 없음."""
     bill_for_status = {
         "공포일":         detail.get("PROM_DT", ""),
         "본회의심의결과": detail.get("RGS_CONF_RSLT", ""),
         "소관위처리결과": detail.get("JRCMIT_PROC_RSLT", ""),
         "법사위처리결과": detail.get("LAW_PROC_RSLT", ""),
     }
+    new_status = _derive_bill_status(bill_for_status)
+
     data = {
+        "committee":        detail.get("JRCMIT_NM") or None,
         "jrcmit_proc_dt":   _to_date(detail.get("JRCMIT_PROC_DT", "")),
         "jrcmit_proc_rslt": detail.get("JRCMIT_PROC_RSLT") or None,
         "law_proc_dt":      _to_date(detail.get("LAW_PROC_DT", "")),
@@ -236,7 +244,7 @@ def update_bill_status(bill_id: str, detail: dict) -> bool:
         "prom_law_nm":      detail.get("PROM_LAW_NM") or None,
         "prom_dt":          _to_date(detail.get("PROM_DT", "")),
         "prom_no":          detail.get("PROM_NO") or None,
-        "status":           _derive_bill_status(bill_for_status),
+        "status":           new_status,
     }
     try:
         result = (
@@ -247,9 +255,9 @@ def update_bill_status(bill_id: str, detail: dict) -> bool:
             .execute()
         )
         if result.data:
-            print(f"  [Supabase] 상태 갱신: {bill_id} → {data['status']}")
+            print(f"  [Supabase] 갱신 완료: {bill_id} → {new_status}")
             return True
         return False
     except Exception as e:
-        print(f"  [Supabase] 상태 갱신 오류: {e}")
+        print(f"  [Supabase] 갱신 오류: {e}")
         return False

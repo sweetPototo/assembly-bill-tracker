@@ -161,7 +161,9 @@ def sync_new_bills(page_size: int = 20) -> int:
         if not new_bills:
             print("  페이지 전체가 기존 법안 → 이후 페이지 건너뜀")
             break
-
+        print(f"발의일 : {bill.get('PROPOSE_DT', '')}")
+        print(f"의안번호 : {bill_no}")
+    
     print(f"[Track A 완료] 신규 저장: {inserted}건")
     return inserted
 
@@ -172,22 +174,22 @@ def sync_new_bills(page_size: int = 20) -> int:
 
 def update_pending_bills() -> int:
     """
-    DB에서 미확정 법안을 꺼내 3차 API로 상태 필드만 갱신.
+    DB에서 미확정 법안을 꺼내 3차 API로 상태·위원회 등 필드를 갱신.
     AI 재실행 없음.
     """
-    print("\n[Track B] 진행중 법안 상태 갱신 시작")
+    print("\n[Track B] 진행중 법안 갱신 시작")
     pending = get_pending_bills()
     print(f"  진행중 법안: {len(pending)}건")
 
     updated = 0
     for i, row in enumerate(pending, start=1):
         bill_id = row["bill_id"]
-        print(f"  [{i}/{len(pending)}] {bill_id} 상태 조회 중...")
+        print(f"  [{i}/{len(pending)}] {bill_id} 조회 중...")
         detail = fetch_bill_detail(bill_id)
         if detail and update_bill_status(bill_id, detail):
             updated += 1
 
-    print(f"[Track B 완료] 상태 갱신: {updated}건")
+    print(f"[Track B 완료] 갱신: {updated}건")
     return updated
 
 

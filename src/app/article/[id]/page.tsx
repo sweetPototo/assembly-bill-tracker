@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
-import TopNav from '@/components/TopNav'
 import ArticleDetail, { Comment } from '@/components/ArticleDetail'
 import { Article } from '@/lib/supabase'
 
@@ -39,7 +38,6 @@ export default async function ArticleDetailPage({
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
-      <TopNav />
       <ArticleDetail article={article} initialComments={comments} />
     </div>
   )

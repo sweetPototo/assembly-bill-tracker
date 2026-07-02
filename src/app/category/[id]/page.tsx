@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
-import TopNav from '@/components/TopNav'
 import CategoryView from '@/components/CategoryView'
 import { Article } from '@/lib/supabase'
 
@@ -36,7 +35,6 @@ export default async function CategoryPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="min-h-screen bg-white">
-      <TopNav />
       <div className="pt-[100px]">
         <CategoryView initialArticles={articles} category={category} />
       </div>

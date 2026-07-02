@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import TopNav from '@/components/TopNav'
 import KeywordTimeline, { TimelineArticle } from '@/components/KeywordTimeline'
 
 async function fetchTimelineData(): Promise<TimelineArticle[]> {
@@ -24,7 +23,6 @@ export default async function HomePage() {
   const articles = await fetchTimelineData()
   return (
     <div className="min-h-screen bg-white">
-      <TopNav />
       <div className="pt-[100px]">
         <KeywordTimeline articles={articles} />
       </div>

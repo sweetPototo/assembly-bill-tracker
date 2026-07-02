@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import TopNav from '@/components/TopNav'
 import ForeignView from '@/components/ForeignView'
 import { Article } from '@/lib/supabase'
 
@@ -29,7 +28,6 @@ export default async function ForeignPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <TopNav />
       <div className="pt-[100px]">
         <ForeignView initialArticles={articles} />
       </div>

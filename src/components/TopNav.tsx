@@ -6,6 +6,7 @@ import { UserCircle } from 'lucide-react'
 
 const BILL_NAV = [
   { href: '/bills',        label: '발의안 홈' },
+  { href: '/bills/all',    label: '전체 발의안' },
   { href: '/bills/active', label: '진행중인 법' },
   { href: '/bills/closed', label: '종료된 법' },
 ]

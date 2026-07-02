@@ -10,15 +10,24 @@
   pip install requests beautifulsoup4 openai python-dotenv supabase
 """
 
+import os
+import sys
+
+# scrapers/ 디렉터리를 path에 추가 — rss_collector, utils.* import를 위해 필요
+_SCRAPERS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+sys.path.insert(0, _SCRAPERS_DIR)
+
+# load_dotenv를 다른 로컬 모듈보다 먼저 실행해야
+# supabase_client 등이 import 시점에 환경변수를 읽을 수 있음
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=os.path.join(_SCRAPERS_DIR, ".env"))
+
 import requests
 from bs4 import BeautifulSoup
-from dotenv import load_dotenv
 from rss_collector import collect_urls_from_rss, RSS_FEED_URLS, collect_bbc_urls, BBC_RSS_FEEDS
 from utils.google_drive import save_and_upload
 from utils.supabase_client import save_article, get_existing_urls
 from utils.ai_client import call_openai, DOMESTIC_NEWS, FOREIGN_NEWS
-
-load_dotenv()  # .env 파일을 읽어서 환경변수로 등록
 
 # ==============================================================================
 # [설정 영역] 자바의 static final 상수 / application.properties 역할
