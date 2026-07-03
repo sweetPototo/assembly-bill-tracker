@@ -36,18 +36,104 @@ export interface Bill {
   rst_proposer: string | null
   status:       string | null
   ai_reason:    string | null
+  view_count:   number
+}
+
+export interface BillDetail {
+  bill_id:          string
+  bill_no:          string
+  bill_name:        string
+  committee:        string | null
+  propose_dt:       string | null
+  proposer:         string | null
+  rst_proposer:     string | null
+  publ_proposer:    string | null
+  member_list:      string | null
+  detail_link:      string | null
+  status:           string | null
+  summary:          string | null
+  ai_reason:        string | null
+  ai_content:       string | null
+  ai_benefit:       string | null
+  ai_consideration: string | null
+  ai_criteria:      string | null
+  view_count:       number
+  // 진행 단계 — 소관위원회
+  jrcmit_cmmt_dt:   string | null
+  jrcmit_prsnt_dt:  string | null
+  jrcmit_proc_dt:   string | null
+  jrcmit_proc_rslt: string | null
+  // 진행 단계 — 법제사법위원회
+  law_cmmt_dt:      string | null
+  law_prsnt_dt:     string | null
+  law_proc_dt:      string | null
+  law_proc_rslt:    string | null
+  // 진행 단계 — 본회의
+  rgs_prsnt_dt:     string | null
+  rgs_rsln_dt:      string | null
+  rgs_conf_rslt:    string | null
 }
 
 export const BILL_PAGE_SIZE = 10
 
-export async function fetchBills(from: number): Promise<Bill[]> {
+export async function fetchBillById(billId: string): Promise<BillDetail | null> {
   const { data, error } = await supabase
     .from('bills')
-    .select('bill_id, bill_no, bill_name, committee, propose_dt, rst_proposer, status, ai_reason')
+    .select(`
+      bill_id, bill_no, bill_name, committee, propose_dt,
+      proposer, rst_proposer, publ_proposer, member_list, detail_link,
+      status, summary,
+      ai_reason, ai_content, ai_benefit, ai_consideration, ai_criteria,
+      view_count,
+      jrcmit_cmmt_dt, jrcmit_prsnt_dt, jrcmit_proc_dt, jrcmit_proc_rslt,
+      law_cmmt_dt, law_prsnt_dt, law_proc_dt, law_proc_rslt,
+      rgs_prsnt_dt, rgs_rsln_dt, rgs_conf_rslt
+    `)
+    .eq('bill_id', billId)
+    .single()
+  if (error) return null
+  return data
+}
+
+export type BillFilter = 'all' | 'active' | 'closed'
+
+export interface BillSearch {
+  keyword?:  string   // bill_name + summary
+  proposer?: string   // rst_proposer + publ_proposer
+}
+
+const CLOSED_STATUSES = ['가결', '부결', '철회', '공포', '폐기']
+
+export async function fetchBills(
+  from: number,
+  filter: BillFilter = 'all',
+  search: BillSearch = {},
+): Promise<Bill[]> {
+  let query = supabase
+    .from('bills')
+    .select('bill_id, bill_no, bill_name, committee, propose_dt, rst_proposer, status, ai_reason, view_count')
+
+  if (filter === 'active') {
+    query = query.eq('status', '진행중')
+  } else if (filter === 'closed') {
+    query = query.in('status', CLOSED_STATUSES)
+  }
+
+  if (search.keyword?.trim()) {
+    const k = `%${search.keyword.trim()}%`
+    query = query.or(`bill_name.ilike.${k},summary.ilike.${k}`)
+  }
+
+  if (search.proposer?.trim()) {
+    const p = `%${search.proposer.trim()}%`
+    query = query.or(`rst_proposer.ilike.${p},publ_proposer.ilike.${p}`)
+  }
+
+  const { data, error } = await query
     .order('propose_dt', { ascending: false, nullsFirst: false })
     .order('bill_id',    { ascending: false })
     .range(from, from + BILL_PAGE_SIZE - 1)
-  if (error) throw error
+  if (error) throw new Error(error.message)
   return data ?? []
 }
 
