@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import TopNav from '@/components/TopNav'
+import ConditionalTopNav from '@/components/ConditionalTopNav'
+import Footer from '@/components/Footer'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -24,8 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko">
       <body className={`${inter.className} antialiased bg-white text-slate-900 min-h-screen`}>
-        <TopNav />
+        <ConditionalTopNav />
         {children}
+        <Footer />
       </body>
     </html>
   )

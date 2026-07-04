@@ -166,9 +166,7 @@ def sync_new_bills(page_size: int = 20) -> int:
         if not new_bills:
             print("  페이지 전체가 기존 법안 → 이후 페이지 건너뜀")
             break
-        print(f"발의일 : {bill.get('PROPOSE_DT', '')}")
-        print(f"의안번호 : {bill_no}")
-    
+
     print(f"[Track A 완료] 신규 저장: {inserted}건")
     return inserted
 

@@ -18,8 +18,8 @@ from api.assembly_bill import fetch_bill_list, fetch_bill_summary, fetch_bill_de
 from utils.ai_client import call_openai, ASSEMBLY_BILL
 from utils.supabase_client import get_existing_bill_nos, save_bill
 
-JUNE_START = "20260601"
-JUNE_END   = "20260630"
+JUNE_START = "2026-06-27"
+JUNE_END   = "2026-06-30"
 
 
 def _in_june(propose_dt: str) -> bool:

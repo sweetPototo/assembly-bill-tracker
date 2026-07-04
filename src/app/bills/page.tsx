@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { fetchAssemblySeats } from '@/lib/supabase'
 import AssemblySeatChart from '@/components/AssemblySeatChart'
 import MonthlyStats from '@/components/MonthlyStats'
+import WeeklyBillChart, { type WeeklyStat } from '@/components/WeeklyBillChart'
+import TopViewedBills, { type TopViewedBill } from '@/components/TopViewedBills'
 
 
 async function fetchStats(): Promise<{ total: number; active: number; passed: number; rejected: number }> {
@@ -40,6 +42,77 @@ async function fetchStats(): Promise<{ total: number; active: number; passed: nu
   return { total: (active ?? 0) + (passed ?? 0) + (rejected ?? 0), active: active ?? 0, passed: passed ?? 0, rejected: rejected ?? 0 }
 }
 
+function getPeriodStarts(): { recentStart: string; recentEnd: string; prevStart: string } {
+  const today = new Date()
+  const fmt = (d: Date) => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+  const addDays = (d: Date, n: number) => {
+    const r = new Date(d); r.setDate(d.getDate() + n); return r
+  }
+  // 오늘(집계 미완료 가능성)은 제외하고,
+  // 최근 구간: 1~7일 전, 이전 구간: 8~14일 전
+  return {
+    recentStart: fmt(addDays(today, -7)),
+    recentEnd: fmt(addDays(today, -1)),
+    prevStart: fmt(addDays(today, -14)),
+  }
+}
+
+async function fetchWeeklyStats(): Promise<{ rows: WeeklyStat[]; hasLastWeek: boolean }> {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+  const { recentStart, recentEnd, prevStart } = getPeriodStarts()
+  const { data, error } = await supabase
+    .from('bills_weekly_statistics')
+    .select('date, category, bill_count')
+    .gte('date', prevStart)
+    .lte('date', recentEnd)
+
+  if (error) console.error('[WeeklyStats]', error.message)
+
+  type Row = { date: string; category: string; bill_count: number }
+  const rows = (data ?? []) as Row[]
+  const thisMap = new Map<string, number>()
+  const lastMap = new Map<string, number>()
+  for (const r of rows) {
+    const map = r.date >= recentStart ? thisMap : lastMap
+    map.set(r.category, (map.get(r.category) ?? 0) + r.bill_count)
+  }
+
+  const hasLastWeek = lastMap.size > 0
+
+  const result: WeeklyStat[] = Array.from(thisMap.entries())
+    .map(([category, count]) => ({
+      category,
+      count,
+      delta: hasLastWeek ? count - (lastMap.get(category) ?? 0) : 0,
+    }))
+    .sort((a, b) => b.count - a.count)
+
+  return { rows: result, hasLastWeek }
+}
+
+async function fetchTopViewed(): Promise<TopViewedBill[]> {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+  const { data, error } = await supabase
+    .from('bills')
+    .select('bill_id, bill_name, category, view_count')
+    .order('view_count', { ascending: false, nullsFirst: false })
+    .limit(3)
+
+  if (error) console.error('[TopViewed]', error.message)
+  return (data ?? []) as TopViewedBill[]
+}
+
 async function fetchRecent() {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,7 +120,7 @@ async function fetchRecent() {
   )
   const { data } = await supabase
     .from('bills')
-    .select('bill_id, bill_name, committee, propose_dt, status, ai_reason')
+    .select('bill_id, bill_name, committee, propose_dt, status, category, ai_reason')
     .order('propose_dt', { ascending: false, nullsFirst: false })
     .order('bill_id',    { ascending: false })
     .limit(5)
@@ -64,7 +137,8 @@ const STATUS_STYLE: Record<string, string> = {
 }
 
 export default async function BillsHomePage() {
-  const [stats, recent, seats] = await Promise.all([fetchStats(), fetchRecent(), fetchAssemblySeats()])
+  const [stats, recent, seats, weekly, topViewed] = await Promise.all([fetchStats(), fetchRecent(), fetchAssemblySeats(), fetchWeeklyStats(), fetchTopViewed()])
+  const { recentStart, recentEnd } = getPeriodStarts()
 
   return (
     <main className="max-w-3xl mx-auto px-4 pt-[116px] pb-16">
@@ -77,6 +151,16 @@ export default async function BillsHomePage() {
 
       {/* 현황 카드 — 모바일 2열, 태블릿 이상 4열 */}
       <MonthlyStats initial={stats} />
+
+      {/* 조회수 TOP3 발의안 */}
+      <div className="rounded-xl border border-slate-100 bg-white p-4 mb-8">
+        <TopViewedBills bills={topViewed} />
+      </div>
+
+      {/* 카테고리별 주간 발의 현황 */}
+      <div className="rounded-xl border border-slate-100 bg-white p-4 mb-8">
+        <WeeklyBillChart rows={weekly.rows} hasLastWeek={weekly.hasLastWeek} dateFrom={recentStart} dateTo={recentEnd} />
+      </div>
 
       {/* 최근 발의안 */}
       <div className="flex items-center justify-between mb-3">
@@ -95,6 +179,11 @@ export default async function BillsHomePage() {
               <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_STYLE[bill.status ?? ''] ?? 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
                 {bill.status ?? '—'}
               </span>
+              {bill.category && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 flex-shrink-0">
+                  {bill.category}
+                </span>
+              )}
               {bill.committee && (
                 <span className="text-xs text-slate-400">{bill.committee}</span>
               )}
@@ -117,18 +206,6 @@ export default async function BillsHomePage() {
           <span className="text-xs text-slate-400">총 299석</span>
         </div>
         <AssemblySeatChart seats={seats} />
-      </div>
-
-      {/* 빠른 이동 */}
-      <div className="grid grid-cols-2 gap-3">
-        <Link href="/bills/active" className="rounded-xl border border-blue-100 bg-blue-50 p-4 active:bg-blue-100 transition-colors">
-          <p className="text-sm font-bold text-blue-700">진행중인 법</p>
-          <p className="text-xs text-blue-500 mt-1">심의가 진행 중인 법률안</p>
-        </Link>
-        <Link href="/bills/closed" className="rounded-xl border border-slate-100 bg-slate-50 p-4 active:bg-slate-100 transition-colors">
-          <p className="text-sm font-bold text-slate-700">종료된 법</p>
-          <p className="text-xs text-slate-500 mt-1">가결·부결·공포된 법률안</p>
-        </Link>
       </div>
 
     </main>

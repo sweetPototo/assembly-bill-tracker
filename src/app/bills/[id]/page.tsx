@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { fetchBillById } from '@/lib/supabase'
 import ViewTracker from './ViewTracker'
 import BackButton from './BackButton'
+import ShareButton from './ShareButton'
 
 const STATUS_STYLE: Record<string, string> = {
   '진행중': 'bg-blue-50 text-blue-600 border border-blue-200',
@@ -17,7 +18,6 @@ const AI_ITEMS = [
   { label: '핵심 내용',          key: 'ai_content' },
   { label: '기대되는 효과',      key: 'ai_benefit' },
   { label: '고려해야 할 점',     key: 'ai_consideration' },
-  { label: '적용 시 주요 판단 기준', key: 'ai_criteria' },
 ] as const
 
 export default async function BillDetailPage({
@@ -30,7 +30,7 @@ export default async function BillDetailPage({
   if (!bill) notFound()
 
   const statusCls = STATUS_STYLE[bill.status ?? ''] ?? 'bg-slate-100 text-slate-500 border border-slate-200'
-  const hasAi = bill.ai_reason || bill.ai_content || bill.ai_benefit || bill.ai_consideration || bill.ai_criteria
+  const hasAi = bill.ai_reason || bill.ai_content || bill.ai_benefit || bill.ai_consideration
 
   return (
     <main className="max-w-2xl mx-auto px-4 pt-[116px] pb-20">
@@ -38,20 +38,28 @@ export default async function BillDetailPage({
 
       {/* 헤더 */}
       <div className="mb-6">
-        <div className="flex items-start gap-2 mb-2">
-          <span className="text-xs text-slate-400 font-mono mt-1 flex-shrink-0">{bill.bill_no}</span>
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <span className="text-xs text-slate-400 font-mono flex-shrink-0">{bill.bill_no}</span>
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${statusCls}`}>
             {bill.status ?? '—'}
           </span>
+          {bill.category && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 flex-shrink-0">
+              {bill.category}
+            </span>
+          )}
         </div>
         <h1 className="text-lg font-bold text-slate-800 leading-snug mb-3">{bill.bill_name}</h1>
 
-        <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-500">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-slate-500">
           <span><span className="text-slate-400 text-xs mr-1">제안일자</span>{bill.propose_dt ?? '—'}</span>
           {bill.proposer && (
             <span><span className="text-slate-400 text-xs mr-1">전체 제안자</span>{bill.proposer}</span>
           )}
-          <span className="text-xs text-slate-400 ml-auto flex-shrink-0">조회 {bill.view_count.toLocaleString()}</span>
+          <div className="ml-auto flex items-center gap-3 flex-shrink-0">
+            <span className="text-xs text-slate-400">조회 {bill.view_count.toLocaleString()}</span>
+            <ShareButton title={bill.bill_name} billNo={bill.bill_no} />
+          </div>
         </div>
       </div>
 
@@ -59,7 +67,7 @@ export default async function BillDetailPage({
       {hasAi && (
         <section className="mb-6">
           <div className="mb-4 p-3 rounded-lg border border-amber-300 bg-amber-50 text-xs text-amber-800 leading-relaxed">
-            ※ AI 요약은 국회가 제공한 제안이유 및 주요내용을 바탕으로 생성되었으며, 법적 효력을 갖는 공식 해석이 아닙니다. 자세한 내용은 국회 원문을 참고하시기 바랍니다.
+            ※ AI가 자동 생성한 요약입니다. 중요한 내용은 반드시 법률안 원문을 확인해 주세요.
           </div>
 
           <h2 className="text-base font-bold text-slate-700 mb-3">AI 요약</h2>
@@ -128,12 +136,13 @@ export default async function BillDetailPage({
             },
             {
               label: '소관위원회',
-              active: !!(bill.jrcmit_cmmt_dt || bill.jrcmit_prsnt_dt || bill.jrcmit_proc_dt || bill.jrcmit_proc_rslt),
+              active: !!(bill.committee || bill.jrcmit_cmmt_dt || bill.jrcmit_prsnt_dt || bill.jrcmit_proc_dt || bill.jrcmit_proc_rslt),
               rows: [
-                { label: '회부일',   value: bill.jrcmit_cmmt_dt },
-                { label: '상정일',   value: bill.jrcmit_prsnt_dt },
-                { label: '처리일',   value: bill.jrcmit_proc_dt },
-                { label: '처리결과', value: bill.jrcmit_proc_rslt },
+                { label: '소관위원회', value: bill.committee },
+                { label: '회부일',     value: bill.jrcmit_cmmt_dt },
+                { label: '상정일',     value: bill.jrcmit_prsnt_dt },
+                { label: '처리일',     value: bill.jrcmit_proc_dt },
+                { label: '처리결과',   value: bill.jrcmit_proc_rslt },
               ],
             },
             {

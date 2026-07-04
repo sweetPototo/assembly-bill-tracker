@@ -215,7 +215,6 @@ def save_bill(bill: dict) -> bool:
         "ai_content":       ai.get("summary") or None,
         "ai_benefit":       ai.get("benefit") or None,
         "ai_consideration": ai.get("consideration") or None,
-        "ai_criteria":      ai.get("criteria") or None,
         "category":         ai.get("category") or None,
     }
     try:

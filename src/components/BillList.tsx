@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { fetchBills, BILL_PAGE_SIZE, type Bill, type BillFilter } from '@/lib/supabase'
+import { fetchBills, BILL_PAGE_SIZE, BILL_CATEGORIES, type Bill, type BillFilter } from '@/lib/supabase'
 
 interface SavedState {
   bills:     Bill[]
@@ -12,6 +12,7 @@ interface SavedState {
   dateField: 'propose_dt' | 'rgs_rsln_dt'
   dateFrom:  string
   dateTo:    string
+  category:  string[]
   hasMore:   boolean
   scrollY:   number
 }
@@ -54,16 +55,37 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
   )
   const [dateFrom, setDateFrom] = useState(initialSearch?.dateFrom ?? '')
   const [dateTo,   setDateTo]   = useState(initialSearch?.dateTo   ?? '')
+  const [categories, setCategories] = useState<string[]>(
+    initialSearch?.category ? initialSearch.category.split(',').filter(Boolean) : []
+  )
+  const [categoryOpen, setCategoryOpen] = useState(false)
+  const categoryRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!categoryOpen) return
+    const onClickOutside = (e: MouseEvent) => {
+      if (categoryRef.current && !categoryRef.current.contains(e.target as Node)) {
+        setCategoryOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [categoryOpen])
+
+  const toggleCategory = useCallback((c: string) => {
+    setCategories(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])
+  }, [])
 
   const statusFilter: 'passed' | 'rejected' | undefined =
     initialSearch?.statusFilter === 'passed'   ? 'passed'   :
     initialSearch?.statusFilter === 'rejected' ? 'rejected' : undefined
 
-  const [bills, setBills]     = useState<Bill[]>([])
-  const [offset, setOffset]   = useState(0)
-  const [loading, setLoading] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
+  const [bills, setBills]           = useState<Bill[]>([])
+  const [offset, setOffset]         = useState(0)
+  const [loading, setLoading]       = useState(false)
+  const [hasMore, setHasMore]       = useState(true)
+  const [error, setError]           = useState<string | null>(null)
+  const [popularSearches, setPopularSearches] = useState<string[]>([])
 
   // true일 때 load effect를 한 번 스킵 (복원 시 세팅)
   const isRestoringRef = useRef(false)
@@ -79,14 +101,33 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
     return () => clearTimeout(t)
   }, [proposer])
 
+  // 인기 검색어 초기 로드
+  useEffect(() => {
+    fetch('/api/popular-searches')
+      .then(r => r.ok ? r.json() : [])
+      .then((data: { term: string }[]) => setPopularSearches(data.map(d => d.term)))
+      .catch(() => {})
+  }, [])
+
+  // 검색어 로깅 — fire-and-forget, 결과와 무관하게 조용히 처리
+  useEffect(() => {
+    const trimmed = debouncedKeyword.trim()
+    if (trimmed.length < 2) return
+    fetch('/api/search-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ term: trimmed }),
+    }).catch(() => {})
+  }, [debouncedKeyword])
+
   const load = useCallback(async (
     from: number, kw: string, pr: string,
-    df: 'propose_dt' | 'rgs_rsln_dt', dFrom: string, dTo: string,
+    df: 'propose_dt' | 'rgs_rsln_dt', dFrom: string, dTo: string, cat: string[],
   ) => {
     setLoading(true)
     setError(null)
     try {
-      const data = await fetchBills(from, filter, { keyword: kw, proposer: pr, dateField: df, dateFrom: dFrom, dateTo: dTo, statusFilter })
+      const data = await fetchBills(from, filter, { keyword: kw, proposer: pr, dateField: df, dateFrom: dFrom, dateTo: dTo, statusFilter, category: cat })
       setBills(prev => {
         if (from === 0) return data
         const existingIds = new Set(prev.map(b => b.bill_id))
@@ -114,6 +155,7 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
     setDateField(saved.dateField)
     setDateFrom(saved.dateFrom)
     setDateTo(saved.dateTo)
+    setCategories(saved.category)
     setHasMore(saved.hasMore)
     setDebouncedKeyword(saved.keyword)
     setDebouncedProposer(saved.proposer)
@@ -129,14 +171,15 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
     setBills([])
     setOffset(0)
     setHasMore(true)
-    load(0, debouncedKeyword, debouncedProposer, dateField, dateFrom, dateTo)
-  }, [debouncedKeyword, debouncedProposer, dateField, dateFrom, dateTo, filter, load])
+    load(0, debouncedKeyword, debouncedProposer, dateField, dateFrom, dateTo, categories)
+  }, [debouncedKeyword, debouncedProposer, dateField, dateFrom, dateTo, categories, filter, load])
 
   const resetSearch = useCallback(() => {
     setKeyword('');    setDebouncedKeyword('')
     setProposer('');   setDebouncedProposer('')
     setDateField('propose_dt')
     setDateFrom('');   setDateTo('')
+    setCategories([])
   }, [])
 
   const saveState = useCallback(() => {
@@ -148,39 +191,16 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
       dateField,
       dateFrom,
       dateTo,
+      category: categories,
       hasMore,
       scrollY: window.scrollY,
     } satisfies SavedState))
-  }, [bills, offset, keyword, proposer, dateField, dateFrom, dateTo, hasMore, filter])
+  }, [bills, offset, keyword, proposer, dateField, dateFrom, dateTo, categories, hasMore, filter])
 
   return (
     <>
-      {/* 검색 */}
-      <div className="flex flex-col sm:flex-row gap-2 mb-3">
-        <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">🔍</span>
-          <input
-            type="search"
-            value={keyword}
-            onChange={e => setKeyword(e.target.value)}
-            placeholder="법안명 · 내용 검색"
-            className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
-          />
-        </div>
-        <div className="relative sm:w-40">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">👤</span>
-          <input
-            type="search"
-            value={proposer}
-            onChange={e => setProposer(e.target.value)}
-            placeholder="발의 의원"
-            className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
-          />
-        </div>
-      </div>
-
       {/* 날짜 검색 + 초기화 */}
-      <div className="flex flex-wrap items-center gap-2 mb-5">
+      <div className="flex flex-wrap items-center gap-2 mb-3">
         <div className="flex rounded-xl border border-slate-200 bg-white overflow-hidden flex-shrink-0">
           {(['propose_dt', 'rgs_rsln_dt'] as const).map(field => (
             <button
@@ -219,6 +239,78 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
         </button>
       </div>
 
+      {/* 검색 */}
+      <div className={`flex flex-col sm:flex-row gap-2 ${popularSearches.length > 0 ? 'mb-3' : 'mb-5'}`}>
+        <div className="relative flex-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">🔍</span>
+          <input
+            type="search"
+            value={keyword}
+            onChange={e => setKeyword(e.target.value)}
+            placeholder="법안명 · 내용 검색"
+            className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
+          />
+        </div>
+        <div className="relative sm:w-40">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">👤</span>
+          <input
+            type="search"
+            value={proposer}
+            onChange={e => setProposer(e.target.value)}
+            placeholder="발의 의원"
+            className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
+          />
+        </div>
+        <div ref={categoryRef} className="relative sm:w-40 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setCategoryOpen(o => !o)}
+            className={`w-full flex items-center justify-between gap-1 px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 ${
+              categories.length > 0
+                ? 'border-blue-300 bg-blue-50 text-blue-600'
+                : 'border-slate-200 bg-white text-slate-500'
+            }`}
+          >
+            <span className="truncate">{categories.length > 0 ? `카테고리 ${categories.length}` : '카테고리'}</span>
+            <span className="text-xs flex-shrink-0">▾</span>
+          </button>
+          {categoryOpen && (
+            <div className="absolute z-10 mt-1 w-full max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg py-1">
+              {BILL_CATEGORIES.map(c => (
+                <label
+                  key={c}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={categories.includes(c)}
+                    onChange={() => toggleCategory(c)}
+                    className="rounded border-slate-300 text-blue-500 focus:ring-blue-300"
+                  />
+                  {c}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 인기 검색어 */}
+      {popularSearches.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 mb-5">
+          <span className="text-xs text-slate-400 flex-shrink-0">인기</span>
+          {popularSearches.map(term => (
+            <button
+              key={term}
+              onClick={() => { setKeyword(term); setDebouncedKeyword(term) }}
+              className="text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+            >
+              {term}
+            </button>
+          ))}
+        </div>
+      )}
+
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">
           조회 오류: {error}
@@ -237,6 +329,11 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
               <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_STYLE[bill.status ?? ''] ?? 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
                 {bill.status ?? '—'}
               </span>
+              {bill.category && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 flex-shrink-0">
+                  {bill.category}
+                </span>
+              )}
               {bill.committee && (
                 <span className="text-xs text-slate-400">{bill.committee}</span>
               )}
@@ -262,7 +359,7 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
       {!loading && !error && hasMore && bills.length > 0 && (
         <div className="mt-6">
           <button
-            onClick={() => load(offset, debouncedKeyword, debouncedProposer, dateField, dateFrom, dateTo)}
+            onClick={() => load(offset, debouncedKeyword, debouncedProposer, dateField, dateFrom, dateTo, categories)}
             className="w-full py-3 rounded-xl text-sm font-semibold text-blue-600 border border-blue-300 hover:bg-blue-50 active:bg-blue-100 transition-colors"
           >
             더보기
@@ -276,7 +373,7 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
 
       {!loading && !error && bills.length === 0 && (
         <p className="text-center text-sm text-slate-400 mt-10">
-          {debouncedKeyword || debouncedProposer || dateFrom || dateTo ? '검색 결과가 없습니다.' : '해당하는 발의안이 없습니다.'}
+          {debouncedKeyword || debouncedProposer || dateFrom || dateTo || categories.length > 0 ? '검색 결과가 없습니다.' : '해당하는 발의안이 없습니다.'}
         </p>
       )}
     </>

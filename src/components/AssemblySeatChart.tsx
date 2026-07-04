@@ -55,9 +55,10 @@ function buildHemicycle(seats: AssemblySeat[]): {
     const n = seatsPerRow[row]
     for (let k = 0; k < n; k++) {
       const angle = (k + 0.5) * Math.PI / n
+      const round4 = (v: number) => Math.round(v * 1e4) / 1e4
       positions.push({
-        x:     CX - r * Math.cos(angle),
-        y:     CY - r * Math.sin(angle),
+        x:     round4(CX - r * Math.cos(angle)),
+        y:     round4(CY - r * Math.sin(angle)),
         angle,
         color: '',
         party: '',

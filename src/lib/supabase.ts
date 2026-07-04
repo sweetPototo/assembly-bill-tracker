@@ -3,7 +3,9 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
+})
 
 // =========================================================
 // 타입 정의 — 자바의 ArticleDto.java (DTO 클래스)와 동일
@@ -35,6 +37,7 @@ export interface Bill {
   propose_dt:   string | null
   rst_proposer: string | null
   status:       string | null
+  category:     string | null
   ai_reason:    string | null
   view_count:   number
 }
@@ -51,12 +54,12 @@ export interface BillDetail {
   member_list:      string | null
   detail_link:      string | null
   status:           string | null
+  category:         string | null
   summary:          string | null
   ai_reason:        string | null
   ai_content:       string | null
   ai_benefit:       string | null
   ai_consideration: string | null
-  ai_criteria:      string | null
   view_count:       number
   // 진행 단계 — 소관위원회
   jrcmit_cmmt_dt:   string | null
@@ -106,8 +109,8 @@ export async function fetchBillById(billId: string): Promise<BillDetail | null> 
     .select(`
       bill_id, bill_no, bill_name, committee, propose_dt,
       proposer, rst_proposer, publ_proposer, member_list, detail_link,
-      status, summary,
-      ai_reason, ai_content, ai_benefit, ai_consideration, ai_criteria,
+      status, category, summary,
+      ai_reason, ai_content, ai_benefit, ai_consideration,
       view_count,
       jrcmit_cmmt_dt, jrcmit_prsnt_dt, jrcmit_proc_dt, jrcmit_proc_rslt,
       law_cmmt_dt, law_prsnt_dt, law_proc_dt, law_proc_rslt,
@@ -128,7 +131,14 @@ export interface BillSearch {
   dateFrom?:     string
   dateTo?:       string
   statusFilter?: 'passed' | 'rejected'
+  category?:     string[]
 }
+
+// scrapers/utils/ai_client.py ASSEMBLY_CATEGORY_BILL 카테고리 목록과 동일
+export const BILL_CATEGORIES = [
+  '경제', '노동', '교육', '복지', '환경', '국방', '외교', '산업',
+  '과학기술', '교통', '금융', '부동산', '의료', '문화', '행정', '사법', '미분류',
+] as const
 
 const CLOSED_STATUSES = ['가결', '부결', '철회', '공포', '폐기']
 
@@ -139,7 +149,7 @@ export async function fetchBills(
 ): Promise<Bill[]> {
   let query = supabase
     .from('bills')
-    .select('bill_id, bill_no, bill_name, committee, propose_dt, rst_proposer, status, ai_reason, view_count')
+    .select('bill_id, bill_no, bill_name, committee, propose_dt, rst_proposer, status, category, ai_reason, view_count')
 
   if (filter === 'active') {
     query = query.eq('status', '진행중')
@@ -161,6 +171,8 @@ export async function fetchBills(
   if (search.dateFrom) query = query.gte(dateCol, search.dateFrom)
   if (search.dateTo)   query = query.lte(dateCol, search.dateTo)
 
+  if (search.category?.length) query = query.in('category', search.category)
+
   if (search.statusFilter === 'passed')
     query = query.in('status', ['가결', '공포'])
   else if (search.statusFilter === 'rejected')
@@ -170,6 +182,30 @@ export async function fetchBills(
     .order('propose_dt', { ascending: false, nullsFirst: false })
     .order('bill_id',    { ascending: false })
     .range(from, from + BILL_PAGE_SIZE - 1)
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+// =========================================================
+// 공지사항
+// =========================================================
+export interface Notice {
+  id:         number
+  title:      string
+  content:    string
+  created_at: string
+  updated_at: string
+}
+
+export const NOTICE_PAGE_SIZE = 10
+
+export async function fetchNotices(from: number): Promise<Notice[]> {
+  const { data, error } = await supabase
+    .from('notices')
+    .select('id, title, content, created_at, updated_at')
+    .eq('is_published', true)
+    .order('created_at', { ascending: false })
+    .range(from, from + NOTICE_PAGE_SIZE - 1)
   if (error) throw new Error(error.message)
   return data ?? []
 }

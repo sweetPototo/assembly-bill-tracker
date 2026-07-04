@@ -114,20 +114,21 @@ ASSEMBLY_BILL = PromptConfig(
         "의료\n"
         "문화\n"
         "행정\n"
-        "사법"
+        "사법\n"
+        "미분류"
     ),
     user_template=(
         "다음은 대한민국 국회에 발의된 법률안의 제안이유 및 주요내용입니다.\n\n"
         "{content}\n\n"
         "다음 형식으로 요약하세요.\n\n"
-        "① 발의 이유\n② 핵심 내용\n③ 기대되는 효과\n④ 고려해야 할 점\n⑤ 적용 시 주요 판단 기준\n\n"
+        "① 발의 이유\n② 핵심 내용\n③ 기대되는 효과\n④ 고려해야 할 점\n"
         "조건\n"
         "- 각 항목은 한 문장\n"
         "- 법안 내용만 근거로 작성\n"
         "- 효과와 고려사항은 가능성을 표현\n\n"
         "제안이유 및 주요내용을 대표하는 카테고리를 선택하세요.\n"
         "반드시 아래 JSON 형식으로만 반환하세요.\n"
-        '{{"reason": "발의이유", "summary": "핵심내용", "benefit": "기대효과", "consideration": "고려사항", "criteria": "판단기준", "category":"카테고리"}}'
+        '{{"reason": "발의이유", "summary": "핵심내용", "benefit": "기대효과", "consideration": "고려사항", "category":"카테고리"}}'
     ),
     content_limit=5000,
     json_mode=True,
