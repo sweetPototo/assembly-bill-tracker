@@ -111,7 +111,7 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
 
   // 인기 검색어 초기 로드
   useEffect(() => {
-    fetch('/api/popular-searches')
+    fetch('/api/popular-searches', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : [])
       .then((data: { term: string }[]) => setPopularSearches(data.map(d => d.term)))
       .catch(() => {})
