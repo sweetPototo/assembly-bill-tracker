@@ -62,6 +62,22 @@ CREATE INDEX idx_bills_status_propose_dt
 CREATE INDEX idx_bills_status_rgs_rsln_dt
   ON bills(status, rgs_rsln_dt DESC NULLS LAST);
 
+-- 카테고리 다중 선택 필터 + propose_dt 정렬 (BillList 카테고리 드롭체크박스, WeeklyBillChart 드릴다운 링크)
+CREATE INDEX idx_bills_category_propose_dt
+  ON bills(category, propose_dt DESC NULLS LAST, bill_id DESC);
+
+-- 조회수 TOP3 정렬 (fetchTopViewed)
+CREATE INDEX idx_bills_view_count
+  ON bills(view_count DESC NULLS LAST);
+
+-- 월별 통계 '가결' COUNT: rgs_rsln_dt/prom_dt OR 범위 중 prom_dt 브랜치
+CREATE INDEX idx_bills_prom_dt
+  ON bills(prom_dt);
+
+-- 월별 통계 '부결' COUNT: rgs_rsln_dt/jrcmit_proc_dt OR 범위 중 jrcmit_proc_dt 브랜치
+CREATE INDEX idx_bills_jrcmit_proc_dt
+  ON bills(jrcmit_proc_dt);
+
 -- 법안명 · 요약 ILIKE 검색 (leading wildcard → trigram 필수)
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE INDEX idx_bills_bill_name_trgm ON bills USING GIN(bill_name gin_trgm_ops);
@@ -97,11 +113,15 @@ create table error_reports (id bigserial primary key, page_url text, description
 create table notices (id bigserial primary key, title text not null, content text not null, is_published boolean default false, created_at timestamptz default now(), updated_at timestamptz default now());
 
 create table bills_weekly_statistics (
-week_start date,
+date date,
 category text,
 bill_count int4,
 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )
+
+-- date 범위 조회 (fetchWeeklyStats) + (date, category) upsert 조회 (assembly_initiative_statistic.py)
+CREATE INDEX idx_bills_weekly_statistics_date_category
+  ON bills_weekly_statistics(date, category);
 
 create table assembly_seat (
 poly_group_nm text,

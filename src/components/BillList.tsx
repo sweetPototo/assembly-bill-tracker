@@ -58,6 +58,16 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
   const [categories, setCategories] = useState<string[]>(
     initialSearch?.category ? initialSearch.category.split(',').filter(Boolean) : []
   )
+
+  // 검색 버튼을 눌렀을 때만 실제 쿼리에 반영되는 committed 값
+  const [committedDateField, setCommittedDateField] = useState<'propose_dt' | 'rgs_rsln_dt'>(
+    initialSearch?.dateField === 'rgs_rsln_dt' ? 'rgs_rsln_dt' : 'propose_dt'
+  )
+  const [committedDateFrom, setCommittedDateFrom] = useState(initialSearch?.dateFrom ?? '')
+  const [committedDateTo,   setCommittedDateTo]   = useState(initialSearch?.dateTo   ?? '')
+  const [committedCategories, setCommittedCategories] = useState<string[]>(
+    initialSearch?.category ? initialSearch.category.split(',').filter(Boolean) : []
+  )
   const [categoryOpen, setCategoryOpen] = useState(false)
   const categoryRef = useRef<HTMLDivElement>(null)
 
@@ -90,16 +100,14 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
   // true일 때 load effect를 한 번 스킵 (복원 시 세팅)
   const isRestoringRef = useRef(false)
 
-  // 300ms 디바운스
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedKeyword(keyword), 300)
-    return () => clearTimeout(t)
-  }, [keyword])
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedProposer(proposer), 300)
-    return () => clearTimeout(t)
-  }, [proposer])
+  const commitSearch = useCallback(() => {
+    setDebouncedKeyword(keyword)
+    setDebouncedProposer(proposer)
+    setCommittedDateField(dateField)
+    setCommittedDateFrom(dateFrom)
+    setCommittedDateTo(dateTo)
+    setCommittedCategories(categories)
+  }, [keyword, proposer, dateField, dateFrom, dateTo, categories])
 
   // 인기 검색어 초기 로드
   useEffect(() => {
@@ -152,10 +160,10 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
     setOffset(saved.offset)
     setKeyword(saved.keyword)
     setProposer(saved.proposer)
-    setDateField(saved.dateField)
-    setDateFrom(saved.dateFrom)
-    setDateTo(saved.dateTo)
-    setCategories(saved.category)
+    setDateField(saved.dateField);       setCommittedDateField(saved.dateField)
+    setDateFrom(saved.dateFrom);         setCommittedDateFrom(saved.dateFrom)
+    setDateTo(saved.dateTo);             setCommittedDateTo(saved.dateTo)
+    setCategories(saved.category);       setCommittedCategories(saved.category)
     setHasMore(saved.hasMore)
     setDebouncedKeyword(saved.keyword)
     setDebouncedProposer(saved.proposer)
@@ -171,15 +179,16 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
     setBills([])
     setOffset(0)
     setHasMore(true)
-    load(0, debouncedKeyword, debouncedProposer, dateField, dateFrom, dateTo, categories)
-  }, [debouncedKeyword, debouncedProposer, dateField, dateFrom, dateTo, categories, filter, load])
+    load(0, debouncedKeyword, debouncedProposer, committedDateField, committedDateFrom, committedDateTo, committedCategories)
+  }, [debouncedKeyword, debouncedProposer, committedDateField, committedDateFrom, committedDateTo, committedCategories, filter, load])
 
   const resetSearch = useCallback(() => {
     setKeyword('');    setDebouncedKeyword('')
     setProposer('');   setDebouncedProposer('')
-    setDateField('propose_dt')
-    setDateFrom('');   setDateTo('')
-    setCategories([])
+    setDateField('propose_dt'); setCommittedDateField('propose_dt')
+    setDateFrom('');   setCommittedDateFrom('')
+    setDateTo('');     setCommittedDateTo('')
+    setCategories([]); setCommittedCategories([])
   }, [])
 
   const saveState = useCallback(() => {
@@ -247,6 +256,7 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
             type="search"
             value={keyword}
             onChange={e => setKeyword(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && commitSearch()}
             placeholder="법안명 · 내용 검색"
             className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
           />
@@ -257,6 +267,7 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
             type="search"
             value={proposer}
             onChange={e => setProposer(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && commitSearch()}
             placeholder="발의 의원"
             className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
           />
@@ -293,6 +304,13 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
             </div>
           )}
         </div>
+        <button
+          type="button"
+          onClick={commitSearch}
+          className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 active:bg-blue-700 transition-colors"
+        >
+          검색
+        </button>
       </div>
 
       {/* 인기 검색어 */}
@@ -359,7 +377,7 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
       {!loading && !error && hasMore && bills.length > 0 && (
         <div className="mt-6">
           <button
-            onClick={() => load(offset, debouncedKeyword, debouncedProposer, dateField, dateFrom, dateTo, categories)}
+            onClick={() => load(offset, debouncedKeyword, debouncedProposer, committedDateField, committedDateFrom, committedDateTo, committedCategories)}
             className="w-full py-3 rounded-xl text-sm font-semibold text-blue-600 border border-blue-300 hover:bg-blue-50 active:bg-blue-100 transition-colors"
           >
             더보기
@@ -373,7 +391,7 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
 
       {!loading && !error && bills.length === 0 && (
         <p className="text-center text-sm text-slate-400 mt-10">
-          {debouncedKeyword || debouncedProposer || dateFrom || dateTo || categories.length > 0 ? '검색 결과가 없습니다.' : '해당하는 발의안이 없습니다.'}
+          {debouncedKeyword || debouncedProposer || committedDateFrom || committedDateTo || committedCategories.length > 0 ? '검색 결과가 없습니다.' : '해당하는 발의안이 없습니다.'}
         </p>
       )}
     </>

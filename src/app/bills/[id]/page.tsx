@@ -215,9 +215,8 @@ export default async function BillDetailPage({
         <h2 className="text-base font-bold text-slate-700 mb-4">발의안 의견 남기기</h2>
         <ol className="space-y-3 text-sm text-slate-600 mb-4">
           {[
-            '국회입법예고 사이트 접속',
-            '진행 중 입법예고 클릭',
-            '법률안명 검색',
+            '국회의안정보시스템에서 보기 클릭',
+            '의안명 오른쪽 [입법예고중] 클릭',
             '의견 남기기',
           ].map((step, i) => (
             <li key={i} className="flex items-center gap-3">
