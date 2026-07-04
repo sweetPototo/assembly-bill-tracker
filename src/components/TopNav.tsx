@@ -24,7 +24,7 @@ export default function TopNav() {
             href="/bills"
             className="text-blue-600 font-extrabold text-xl tracking-tight hover:text-blue-500 transition-colors py-2"
           >
-            오늘의 국회
+            짧은 국회
           </Link>
         </div>
 

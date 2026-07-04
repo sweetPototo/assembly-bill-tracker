@@ -1,47 +1,43 @@
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
+import { fetchAssemblySeats } from '@/lib/supabase'
+import AssemblySeatChart from '@/components/AssemblySeatChart'
+import MonthlyStats from '@/components/MonthlyStats'
 
 
-async function fetchStats(): Promise<{ total: number; active: number; passed: number; rejected: number; monthLabel: string }> {
+async function fetchStats(): Promise<{ total: number; active: number; passed: number; rejected: number }> {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
   const now        = new Date()
-  const firstDay   = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-  const lastDay    = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  const lastDayStr = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`
-  const monthLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월`
+  const pad        = (n: number) => String(n).padStart(2, '0')
+  const firstDay   = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`
+  const lastDayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate())}`
 
-  const { data } = await supabase
-    .from('bills')
-    .select('status, propose_dt, rgs_rsln_dt, prom_dt, jrcmit_proc_dt')
+  const base = () => supabase.from('bills').select('*', { count: 'exact', head: true })
+  const inMonthOr = (...cols: string[]) =>
+    cols.map(c => `and(${c}.gte.${firstDay},${c}.lte.${lastDayStr})`).join(',')
 
-  type Row = { status: string | null; propose_dt: string | null; rgs_rsln_dt: string | null; prom_dt: string | null; jrcmit_proc_dt: string | null }
-  const rows = (data ?? []) as Row[]
+  const [
+    { count: active },
+    { count: passed },
+    { count: rejected },
+  ] = await Promise.all([
+    base()
+      .eq('status', '진행중')
+      .gte('propose_dt', firstDay)
+      .lte('propose_dt', lastDayStr),
+    base()
+      .in('status', ['가결', '공포'])
+      .or(inMonthOr('rgs_rsln_dt', 'prom_dt')),
+    base()
+      .in('status', ['부결', '철회', '폐기'])
+      .or(inMonthOr('rgs_rsln_dt', 'jrcmit_proc_dt')),
+  ])
 
-  const inMonth = (dt: string | null) => !!dt && dt >= firstDay && dt <= lastDayStr
-
-  // 진행중: 이번 달 발의 후 아직 심의 중
-  const active = rows.filter(r =>
-    r.status === '진행중' && inMonth(r.propose_dt)
-  ).length
-
-  // 가결·공포: 본회의 의결일 또는 공포일이 이번 달
-  const passed = rows.filter(r =>
-    (r.status === '가결' || r.status === '공포') &&
-    (inMonth(r.rgs_rsln_dt) || inMonth(r.prom_dt))
-  ).length
-
-  // 부결·종료: 본회의 의결일 또는 소관위 처리일이 이번 달
-  const rejected = rows.filter(r =>
-    (r.status === '부결' || r.status === '철회' || r.status === '폐기') &&
-    (inMonth(r.rgs_rsln_dt) || inMonth(r.jrcmit_proc_dt))
-  ).length
-
-  const total = active + passed + rejected
-  return { total, active, passed, rejected, monthLabel }
+  return { total: (active ?? 0) + (passed ?? 0) + (rejected ?? 0), active: active ?? 0, passed: passed ?? 0, rejected: rejected ?? 0 }
 }
 
 async function fetchRecent() {
@@ -68,7 +64,7 @@ const STATUS_STYLE: Record<string, string> = {
 }
 
 export default async function BillsHomePage() {
-  const [stats, recent] = await Promise.all([fetchStats(), fetchRecent()])
+  const [stats, recent, seats] = await Promise.all([fetchStats(), fetchRecent(), fetchAssemblySeats()])
 
   return (
     <main className="max-w-3xl mx-auto px-4 pt-[116px] pb-16">
@@ -80,23 +76,7 @@ export default async function BillsHomePage() {
       </div>
 
       {/* 현황 카드 — 모바일 2열, 태블릿 이상 4열 */}
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-bold text-slate-600">이달의 발의 현황</h2>
-        <span className="text-xs text-slate-400">{stats.monthLabel}</span>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-        {[
-          { label: '전체',      value: stats.total,    color: 'text-slate-700' },
-          { label: '진행중',    value: stats.active,   color: 'text-blue-600'  },
-          { label: '가결',      value: stats.passed,   color: 'text-green-600' },
-          { label: '부결·종료', value: stats.rejected, color: 'text-slate-500' },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-center">
-            <p className={`text-2xl font-bold ${color}`}>{value.toLocaleString()}</p>
-            <p className="text-xs text-slate-500 mt-1">{label}</p>
-          </div>
-        ))}
-      </div>
+      <MonthlyStats initial={stats} />
 
       {/* 최근 발의안 */}
       <div className="flex items-center justify-between mb-3">
@@ -128,6 +108,15 @@ export default async function BillsHomePage() {
             )}
           </Link>
         ))}
+      </div>
+
+      {/* 의석 현황 */}
+      <div style={{ maxWidth: 540 }} className="mx-auto mb-8 hidden">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm font-bold text-slate-600">22대 국회 의석 현황</h2>
+          <span className="text-xs text-slate-400">총 299석</span>
+        </div>
+        <AssemblySeatChart seats={seats} />
       </div>
 
       {/* 빠른 이동 */}

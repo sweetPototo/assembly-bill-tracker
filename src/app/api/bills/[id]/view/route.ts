@@ -8,8 +8,9 @@ export async function POST(
   const { id } = await params
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
-  await supabase.rpc('increment_bill_view', { bill_id_param: id })
+  const { error } = await supabase.rpc('increment_bill_view', { bill_id_param: id })
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

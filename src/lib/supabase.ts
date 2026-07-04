@@ -74,6 +74,30 @@ export interface BillDetail {
   rgs_conf_rslt:    string | null
 }
 
+// =========================================================
+// 국회 의석 현황
+// =========================================================
+export interface AssemblySeat {
+  poly_group_nm: string | null
+  poly_nm:       string | null
+  region:        number | null
+  representative:number | null
+  sum:           number | null
+  per:           number | null
+}
+
+export async function fetchAssemblySeats(): Promise<AssemblySeat[]> {
+  // assembly_seat는 RLS로 anon 접근이 막혀 있으므로 서버 전용 service_role 클라이언트 사용
+  const serverClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+  const { data } = await serverClient
+    .from('assembly_seat')
+    .select('poly_group_nm, poly_nm, region, representative, sum, per')
+  return data ?? []
+}
+
 export const BILL_PAGE_SIZE = 10
 
 export async function fetchBillById(billId: string): Promise<BillDetail | null> {
@@ -98,8 +122,12 @@ export async function fetchBillById(billId: string): Promise<BillDetail | null> 
 export type BillFilter = 'all' | 'active' | 'closed'
 
 export interface BillSearch {
-  keyword?:  string   // bill_name + summary
-  proposer?: string   // rst_proposer + publ_proposer
+  keyword?:      string
+  proposer?:     string
+  dateField?:    'propose_dt' | 'rgs_rsln_dt'
+  dateFrom?:     string
+  dateTo?:       string
+  statusFilter?: 'passed' | 'rejected'
 }
 
 const CLOSED_STATUSES = ['가결', '부결', '철회', '공포', '폐기']
@@ -128,6 +156,15 @@ export async function fetchBills(
     const p = `%${search.proposer.trim()}%`
     query = query.or(`rst_proposer.ilike.${p},publ_proposer.ilike.${p}`)
   }
+
+  const dateCol = search.dateField ?? 'propose_dt'
+  if (search.dateFrom) query = query.gte(dateCol, search.dateFrom)
+  if (search.dateTo)   query = query.lte(dateCol, search.dateTo)
+
+  if (search.statusFilter === 'passed')
+    query = query.in('status', ['가결', '공포'])
+  else if (search.statusFilter === 'rejected')
+    query = query.in('status', ['부결', '철회', '폐기'])
 
   const { data, error } = await query
     .order('propose_dt', { ascending: false, nullsFirst: false })

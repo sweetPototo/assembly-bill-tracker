@@ -216,6 +216,7 @@ def save_bill(bill: dict) -> bool:
         "ai_benefit":       ai.get("benefit") or None,
         "ai_consideration": ai.get("consideration") or None,
         "ai_criteria":      ai.get("criteria") or None,
+        "category":         ai.get("category") or None,
     }
     try:
         result = _get_client().table("bills").insert(data).execute()
@@ -225,6 +226,42 @@ def save_bill(bill: dict) -> bool:
         return False
     except Exception as e:
         print(f"  [Supabase] 의안 저장 오류: {e}")
+        return False
+
+
+def get_bills_without_category() -> list[dict]:
+    """category가 NULL인 bills 목록(bill_id, bill_name, summary) 반환."""
+    try:
+        result = (
+            _get_client()
+            .table("bills")
+            .select("bill_id,bill_name,summary")
+            .is_("category", "null")
+            .not_.is_("summary", "null")
+            .execute()
+        )
+        return result.data or []
+    except Exception as e:
+        print(f"  [Supabase] 카테고리 없는 의안 조회 오류: {e}")
+        return []
+
+
+def update_bill_category(bill_id: str, category: str) -> bool:
+    """bill_id에 해당하는 법안의 category 필드만 갱신."""
+    try:
+        result = (
+            _get_client()
+            .table("bills")
+            .update({"category": category})
+            .eq("bill_id", bill_id)
+            .execute()
+        )
+        if result.data:
+            print(f"  [Supabase] 카테고리 갱신: {bill_id} → {category}")
+            return True
+        return False
+    except Exception as e:
+        print(f"  [Supabase] 카테고리 갱신 오류 ({bill_id}): {e}")
         return False
 
 

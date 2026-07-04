@@ -11,10 +11,10 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: '짧은 신문',
+  title: '짧은 국회',
   description: '바쁜 일상 속 우리의 권리를 지키는 짧은 시국 뉴스',
   icons: {
-    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' font-weight='bold' fill='%2360a5fa'>3</text></svg>",
+    icon: '/icon.png',
   },
 }
 

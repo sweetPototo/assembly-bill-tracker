@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { fetchBillById } from '@/lib/supabase'
 import ViewTracker from './ViewTracker'
+import BackButton from './BackButton'
 
 const STATUS_STYLE: Record<string, string> = {
   '진행중': 'bg-blue-50 text-blue-600 border border-blue-200',
@@ -201,7 +202,7 @@ export default async function BillDetailPage({
       </section>
 
       {/* 발의안 의견 남기기 */}
-      <section className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+      <section className="rounded-xl border border-slate-200 bg-slate-50 p-5" id="opinion">
         <h2 className="text-base font-bold text-slate-700 mb-4">발의안 의견 남기기</h2>
         <ol className="space-y-3 text-sm text-slate-600 mb-4">
           {[
@@ -228,6 +229,8 @@ export default async function BillDetailPage({
           국회 입법예고 바로가기
         </a>
       </section>
+
+      <BackButton />
 
     </main>
   )

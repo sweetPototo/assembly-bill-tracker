@@ -1,8 +1,34 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { fetchBills, BILL_PAGE_SIZE, type Bill, type BillFilter } from '@/lib/supabase'
+
+interface SavedState {
+  bills:     Bill[]
+  offset:    number
+  keyword:   string
+  proposer:  string
+  dateField: 'propose_dt' | 'rgs_rsln_dt'
+  dateFrom:  string
+  dateTo:    string
+  hasMore:   boolean
+  scrollY:   number
+}
+
+function readSavedState(filter: BillFilter): SavedState | null {
+  // useEffect 안에서만 호출 — window 가드 불필요
+  if (sessionStorage.getItem('billList_navigate_back') !== '1') return null
+  sessionStorage.removeItem('billList_navigate_back')
+  try {
+    const raw = sessionStorage.getItem(`billList_${filter}`)
+    if (!raw) return null
+    sessionStorage.removeItem(`billList_${filter}`)
+    return JSON.parse(raw) as SavedState
+  } catch {
+    return null
+  }
+}
 
 const STATUS_STYLE: Record<string, string> = {
   '진행중': 'bg-blue-50 text-blue-600 border border-blue-200',
@@ -14,20 +40,33 @@ const STATUS_STYLE: Record<string, string> = {
 }
 
 interface Props {
-  filter?: BillFilter
+  filter?:        BillFilter
+  initialSearch?: Record<string, string>
 }
 
-export default function BillList({ filter = 'all' }: Props) {
+export default function BillList({ filter = 'all', initialSearch }: Props) {
   const [keyword,  setKeyword]  = useState('')
   const [proposer, setProposer] = useState('')
   const [debouncedKeyword,  setDebouncedKeyword]  = useState('')
   const [debouncedProposer, setDebouncedProposer] = useState('')
+  const [dateField, setDateField] = useState<'propose_dt' | 'rgs_rsln_dt'>(
+    initialSearch?.dateField === 'rgs_rsln_dt' ? 'rgs_rsln_dt' : 'propose_dt'
+  )
+  const [dateFrom, setDateFrom] = useState(initialSearch?.dateFrom ?? '')
+  const [dateTo,   setDateTo]   = useState(initialSearch?.dateTo   ?? '')
+
+  const statusFilter: 'passed' | 'rejected' | undefined =
+    initialSearch?.statusFilter === 'passed'   ? 'passed'   :
+    initialSearch?.statusFilter === 'rejected' ? 'rejected' : undefined
 
   const [bills, setBills]     = useState<Bill[]>([])
   const [offset, setOffset]   = useState(0)
   const [loading, setLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [error, setError]     = useState<string | null>(null)
+
+  // true일 때 load effect를 한 번 스킵 (복원 시 세팅)
+  const isRestoringRef = useRef(false)
 
   // 300ms 디바운스
   useEffect(() => {
@@ -40,11 +79,14 @@ export default function BillList({ filter = 'all' }: Props) {
     return () => clearTimeout(t)
   }, [proposer])
 
-  const load = useCallback(async (from: number, kw: string, pr: string) => {
+  const load = useCallback(async (
+    from: number, kw: string, pr: string,
+    df: 'propose_dt' | 'rgs_rsln_dt', dFrom: string, dTo: string,
+  ) => {
     setLoading(true)
     setError(null)
     try {
-      const data = await fetchBills(from, filter, { keyword: kw, proposer: pr })
+      const data = await fetchBills(from, filter, { keyword: kw, proposer: pr, dateField: df, dateFrom: dFrom, dateTo: dTo, statusFilter })
       setBills(prev => {
         if (from === 0) return data
         const existingIds = new Set(prev.map(b => b.bill_id))
@@ -57,20 +99,64 @@ export default function BillList({ filter = 'all' }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [filter])
+  }, [filter, statusFilter])
 
-  // 검색어 변경 시 처음부터 다시 로드
+  // 뒤로가기 복원 — useEffect 안에서만 sessionStorage 접근 (SSR에서는 실행 안 됨)
+  // 반드시 load effect보다 먼저 선언해야 React가 먼저 실행함
   useEffect(() => {
+    const saved = readSavedState(filter)
+    if (!saved) return
+    isRestoringRef.current = true
+    setBills(saved.bills)
+    setOffset(saved.offset)
+    setKeyword(saved.keyword)
+    setProposer(saved.proposer)
+    setDateField(saved.dateField)
+    setDateFrom(saved.dateFrom)
+    setDateTo(saved.dateTo)
+    setHasMore(saved.hasMore)
+    setDebouncedKeyword(saved.keyword)
+    setDebouncedProposer(saved.proposer)
+    requestAnimationFrame(() => window.scrollTo({ top: saved.scrollY, behavior: 'instant' }))
+  }, [filter]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 검색어 변경 시 처음부터 다시 로드 (복원 직후엔 스킵)
+  useEffect(() => {
+    if (isRestoringRef.current) {
+      isRestoringRef.current = false
+      return
+    }
     setBills([])
     setOffset(0)
     setHasMore(true)
-    load(0, debouncedKeyword, debouncedProposer)
-  }, [debouncedKeyword, debouncedProposer, filter, load])
+    load(0, debouncedKeyword, debouncedProposer, dateField, dateFrom, dateTo)
+  }, [debouncedKeyword, debouncedProposer, dateField, dateFrom, dateTo, filter, load])
+
+  const resetSearch = useCallback(() => {
+    setKeyword('');    setDebouncedKeyword('')
+    setProposer('');   setDebouncedProposer('')
+    setDateField('propose_dt')
+    setDateFrom('');   setDateTo('')
+  }, [])
+
+  const saveState = useCallback(() => {
+    sessionStorage.setItem(`billList_${filter}`, JSON.stringify({
+      bills,
+      offset,
+      keyword,
+      proposer,
+      dateField,
+      dateFrom,
+      dateTo,
+      hasMore,
+      scrollY: window.scrollY,
+    } satisfies SavedState))
+  }, [bills, offset, keyword, proposer, dateField, dateFrom, dateTo, hasMore, filter])
 
   return (
     <>
       {/* 검색 */}
-      <div className="flex flex-col sm:flex-row gap-2 mb-5">
+      <div className="flex flex-col sm:flex-row gap-2 mb-3">
         <div className="relative flex-1">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">🔍</span>
           <input
@@ -93,6 +179,46 @@ export default function BillList({ filter = 'all' }: Props) {
         </div>
       </div>
 
+      {/* 날짜 검색 + 초기화 */}
+      <div className="flex flex-wrap items-center gap-2 mb-5">
+        <div className="flex rounded-xl border border-slate-200 bg-white overflow-hidden flex-shrink-0">
+          {(['propose_dt', 'rgs_rsln_dt'] as const).map(field => (
+            <button
+              key={field}
+              onClick={() => setDateField(field)}
+              className={`px-3 py-2 text-xs font-medium transition-colors ${
+                dateField === field
+                  ? 'bg-blue-500 text-white'
+                  : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              {field === 'propose_dt' ? '제안일' : '종료일'}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 flex-1 min-w-[220px]">
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
+          />
+          <span className="text-slate-400 text-sm flex-shrink-0">~</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
+          />
+        </div>
+        <button
+          onClick={resetSearch}
+          className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-medium text-slate-500 border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors"
+        >
+          초기화
+        </button>
+      </div>
+
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">
           조회 오류: {error}
@@ -104,6 +230,7 @@ export default function BillList({ filter = 'all' }: Props) {
           <Link
             key={bill.bill_id}
             href={`/bills/${bill.bill_id}`}
+            onClick={saveState}
             className="py-4 block active:bg-slate-50 rounded-lg transition-colors"
           >
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
@@ -135,7 +262,7 @@ export default function BillList({ filter = 'all' }: Props) {
       {!loading && !error && hasMore && bills.length > 0 && (
         <div className="mt-6">
           <button
-            onClick={() => load(offset, debouncedKeyword, debouncedProposer)}
+            onClick={() => load(offset, debouncedKeyword, debouncedProposer, dateField, dateFrom, dateTo)}
             className="w-full py-3 rounded-xl text-sm font-semibold text-blue-600 border border-blue-300 hover:bg-blue-50 active:bg-blue-100 transition-colors"
           >
             더보기
@@ -149,7 +276,7 @@ export default function BillList({ filter = 'all' }: Props) {
 
       {!loading && !error && bills.length === 0 && (
         <p className="text-center text-sm text-slate-400 mt-10">
-          {debouncedKeyword || debouncedProposer ? '검색 결과가 없습니다.' : '해당하는 발의안이 없습니다.'}
+          {debouncedKeyword || debouncedProposer || dateFrom || dateTo ? '검색 결과가 없습니다.' : '해당하는 발의안이 없습니다.'}
         </p>
       )}
     </>
