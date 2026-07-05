@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
+
+export const dynamic = 'force-dynamic'
 import { fetchAssemblySeats } from '@/lib/supabase'
 import AssemblySeatChart from '@/components/AssemblySeatChart'
 import MonthlyStats from '@/components/MonthlyStats'
@@ -200,9 +202,9 @@ export default async function BillsHomePage() {
       </div>
 
       {/* 의석 현황 */}
-      <div style={{ maxWidth: 540 }} className="mx-auto mb-8 hidden">
+      <div style={{ maxWidth: 1080 }} className="mx-auto mb-8">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-bold text-slate-600">22대 국회 의석 현황</h2>
+          <h2 className="text-base font-bold text-slate-600">22대 국회 의석 현황</h2>
           <span className="text-xs text-slate-400">총 299석</span>
         </div>
         <AssemblySeatChart seats={seats} />

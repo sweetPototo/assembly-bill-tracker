@@ -15,12 +15,14 @@ const PARTY_COLOR: Record<string, string> = {
 }
 
 // 반원 파라미터
-const CX      = 92    // 반원 중심 x
-const CY      = 85    // 반원 중심 y (하단)
-const R_START = 46    // 첫 번째(가장 안쪽) 행 반지름
-const R_STEP  = 6     // 행 간격 (이전 11의 절반)
-const N_ROWS  = 7     // 행 수
-const SEAT_W  = 4.2   // 의석 사각형 한 변 크기 (이전 2.8의 1.5배)
+const CX      = 184    // 반원 중심 x (가로 2배 확장에 맞춰 조정)
+const CY      = 110.5  // 반원 중심 y (하단) — 세로 1.3배 확장에 맞춰 조정
+const R_START = 46     // 첫 번째(가장 안쪽) 행 반지름
+const R_STEP  = 6      // 행 간격 (이전 11의 절반)
+const N_ROWS  = 7      // 행 수
+const X_SCALE = 2      // 가로 반지름 배율 — 가로 폭만 2배로 넓힘
+const Y_SCALE = 1.3    // 세로 반지름 배율 — 세로를 추가로 1.3배 넓힘
+const SEAT_W  = 4.2   // 의석 사각형 한 변 크기 (이전 2.8의 1.5배) — 회전 없이 정사각형 유지
 const SEAT_RX = 0.8   // 모서리 둥글기
 
 type SeatPos = {
@@ -57,8 +59,8 @@ function buildHemicycle(seats: AssemblySeat[]): {
       const angle = (k + 0.5) * Math.PI / n
       const round4 = (v: number) => Math.round(v * 1e4) / 1e4
       positions.push({
-        x:     round4(CX - r * Math.cos(angle)),
-        y:     round4(CY - r * Math.sin(angle)),
+        x:     round4(CX - r * X_SCALE * Math.cos(angle)),
+        y:     round4(CY - r * Y_SCALE * Math.sin(angle)),
         angle,
         color: '',
         party: '',
@@ -89,11 +91,11 @@ export default function AssemblySeatChart({ seats }: { seats: AssemblySeat[] }) 
   const hoveredParty = hovered ? parties.find(s => s.poly_nm === hovered) : null
 
   return (
-    <div className="rounded-xl border border-slate-100 bg-white p-4 flex items-center gap-4">
-      {/* 의석 배치도 */}
+    <div className="rounded-xl border border-slate-100 bg-white p-4 flex flex-col sm:flex-row items-center gap-4">
+      {/* 의석 배치도 — 가로만 2배로 넓힌 반원 (세로 비율은 원본 유지, 회전 없이 정사각형 격자) */}
       <svg
-        viewBox="0 0 184 90"
-        style={{ width: 270, flexShrink: 0 }}
+        viewBox="0 0 368 117"
+        style={{ width: 540, maxWidth: '100%', height: 'auto', flexShrink: 0 }}
         aria-label="국회 의석 배치도"
       >
         {positions.map((seat, i) => (
