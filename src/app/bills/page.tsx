@@ -2,74 +2,70 @@ import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
-import { fetchAssemblySeats } from '@/lib/supabase'
+import { fetchAssemblySeats, type ComparisonStats, type PeriodStats } from '@/lib/supabase'
 import AssemblySeatChart from '@/components/AssemblySeatChart'
 import MonthlyStats from '@/components/MonthlyStats'
 import WeeklyBillChart, { type WeeklyStat } from '@/components/WeeklyBillChart'
 import TopViewedBills, { type TopViewedBill } from '@/components/TopViewedBills'
 
 
-async function fetchStats(): Promise<{ total: number; active: number; passed: number; rejected: number }> {
+async function fetchStats(): Promise<ComparisonStats> {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  const now        = new Date()
-  const pad        = (n: number) => String(n).padStart(2, '0')
-  const firstDay   = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`
-  const lastDayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate())}`
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  const add = (d: Date, n: number) => { const r = new Date(d); r.setDate(r.getDate()+n); return r }
+
+  const yesterday = add(new Date(), -1)
+  const p1End   = fmt(yesterday)
+  const p1Start = fmt(add(yesterday, -6))   // 7 days ending yesterday
+  const p2End   = fmt(add(yesterday, -7))
+  const p2Start = fmt(add(yesterday, -13))  // preceding 7 days
 
   const base = () => supabase.from('bills').select('*', { count: 'exact', head: true })
-  const inMonthOr = (...cols: string[]) =>
-    cols.map(c => `and(${c}.gte.${firstDay},${c}.lte.${lastDayStr})`).join(',')
+  const inRangeOr = (s: string, e: string, ...cols: string[]) =>
+    cols.map(c => `and(${c}.gte.${s},${c}.lte.${e})`).join(',')
 
   const [
-    { count: active },
-    { count: passed },
-    { count: rejected },
+    { count: a1 }, { count: p1 }, { count: r1 },
+    { count: a2 }, { count: p2 }, { count: r2 },
   ] = await Promise.all([
-    base()
-      .eq('status', '진행중')
-      .gte('propose_dt', firstDay)
-      .lte('propose_dt', lastDayStr),
-    base()
-      .in('status', ['가결', '공포'])
-      .or(inMonthOr('rgs_rsln_dt', 'prom_dt')),
-    base()
-      .in('status', ['부결', '철회', '폐기'])
-      .or(inMonthOr('rgs_rsln_dt', 'jrcmit_proc_dt')),
+    base().eq('status', '진행중').gte('propose_dt', p1Start).lte('propose_dt', p1End),
+    base().in('status', ['가결', '공포']).or(inRangeOr(p1Start, p1End, 'rgs_rsln_dt', 'prom_dt')),
+    base().in('status', ['부결', '철회', '폐기']).or(inRangeOr(p1Start, p1End, 'rgs_rsln_dt', 'jrcmit_proc_dt')),
+    base().eq('status', '진행중').gte('propose_dt', p2Start).lte('propose_dt', p2End),
+    base().in('status', ['가결', '공포']).or(inRangeOr(p2Start, p2End, 'rgs_rsln_dt', 'prom_dt')),
+    base().in('status', ['부결', '철회', '폐기']).or(inRangeOr(p2Start, p2End, 'rgs_rsln_dt', 'jrcmit_proc_dt')),
   ])
 
-  return { total: (active ?? 0) + (passed ?? 0) + (rejected ?? 0), active: active ?? 0, passed: passed ?? 0, rejected: rejected ?? 0 }
+  const mk = (a: number, p: number, r: number): PeriodStats =>
+    ({ active: a, passed: p, rejected: r, total: a + p + r })
+
+  return {
+    current: mk(a1 ?? 0, p1 ?? 0, r1 ?? 0),
+    previous: mk(a2 ?? 0, p2 ?? 0, r2 ?? 0),
+    currentStart: p1Start,
+    currentEnd: p1End,
+  }
 }
 
-function getPeriodStarts(): { recentStart: string; recentEnd: string; prevStart: string } {
-  const today = new Date()
-  const fmt = (d: Date) => {
-    const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    return `${y}-${m}-${day}`
-  }
-  const addDays = (d: Date, n: number) => {
-    const r = new Date(d); r.setDate(d.getDate() + n); return r
-  }
-  // 오늘(집계 미완료 가능성)은 제외하고,
-  // 최근 구간: 1~7일 전, 이전 구간: 8~14일 전
-  return {
-    recentStart: fmt(addDays(today, -7)),
-    recentEnd: fmt(addDays(today, -1)),
-    prevStart: fmt(addDays(today, -14)),
-  }
-}
 
 async function fetchWeeklyStats(): Promise<{ rows: WeeklyStat[]; hasLastWeek: boolean }> {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
-  const { recentStart, recentEnd, prevStart } = getPeriodStarts()
+  const fmtD = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  const addD = (d: Date, n: number) => { const r = new Date(d); r.setDate(r.getDate()+n); return r }
+  const yesterday = addD(new Date(), -1)
+  const recentEnd   = fmtD(yesterday)
+  const recentStart = fmtD(addD(yesterday, -6))
+  const prevStart   = fmtD(addD(yesterday, -13))
+
   const { data, error } = await supabase
     .from('bills_weekly_statistics')
     .select('date, category, bill_count')
@@ -140,7 +136,7 @@ const STATUS_STYLE: Record<string, string> = {
 
 export default async function BillsHomePage() {
   const [stats, recent, seats, weekly, topViewed] = await Promise.all([fetchStats(), fetchRecent(), fetchAssemblySeats(), fetchWeeklyStats(), fetchTopViewed()])
-  const { recentStart, recentEnd } = getPeriodStarts()
+  const { currentStart: recentStart, currentEnd: recentEnd } = stats
 
   return (
     <main className="max-w-3xl mx-auto px-4 pt-[116px] pb-16">

@@ -11,7 +11,7 @@ bills_weekly_statistics 테이블에 저장합니다.
 
 import os
 import sys
-from datetime import date
+from datetime import date, timedelta
 from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
@@ -38,7 +38,7 @@ def fetch_bill_counts_by_category(target_date: str) -> dict[str, int]:
 
 def run():
     client = _get_client()
-    target_date = date.today().isoformat()
+    target_date = (date.today() - timedelta(days=1)).isoformat()
     print(f"[일별 통계] date: {target_date}")
 
     # 카테고리별 집계

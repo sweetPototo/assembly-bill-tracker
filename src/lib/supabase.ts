@@ -101,6 +101,12 @@ export async function fetchAssemblySeats(): Promise<AssemblySeat[]> {
   return data ?? []
 }
 
+export type PeriodStats = { total: number; active: number; passed: number; rejected: number }
+export type ComparisonStats = {
+  current: PeriodStats; previous: PeriodStats
+  currentStart: string; currentEnd: string
+}
+
 export const BILL_PAGE_SIZE = 10
 
 export async function fetchBillById(billId: string): Promise<BillDetail | null> {
