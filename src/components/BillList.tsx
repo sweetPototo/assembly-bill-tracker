@@ -96,6 +96,13 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
   const [hasMore, setHasMore]       = useState(true)
   const [error, setError]           = useState<string | null>(null)
   const [popularSearches, setPopularSearches] = useState<string[]>([])
+  const [showScroll, setShowScroll] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setShowScroll(window.scrollY > 300)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   // true일 때 load effect를 한 번 스킵 (복원 시 세팅)
   const isRestoringRef = useRef(false)
@@ -393,6 +400,27 @@ export default function BillList({ filter = 'all', initialSearch }: Props) {
         <p className="text-center text-sm text-slate-400 mt-10">
           {debouncedKeyword || debouncedProposer || committedDateFrom || committedDateTo || committedCategories.length > 0 ? '검색 결과가 없습니다.' : '해당하는 발의안이 없습니다.'}
         </p>
+      )}
+
+      {showScroll && (
+        <div className="fixed bottom-6 right-4 flex flex-col gap-2 z-50">
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="w-11 h-11 flex items-center justify-center rounded-full bg-white border border-slate-200 shadow-md text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition-colors text-base"
+            aria-label="맨 위로"
+            title="맨 위로"
+          >
+            ↑
+          </button>
+          <button
+            onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}
+            className="w-11 h-11 flex items-center justify-center rounded-full bg-white border border-slate-200 shadow-md text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition-colors text-base"
+            aria-label="맨 아래로"
+            title="맨 아래로"
+          >
+            ↓
+          </button>
+        </div>
       )}
     </>
   )
