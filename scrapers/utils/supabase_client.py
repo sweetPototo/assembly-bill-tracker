@@ -135,6 +135,8 @@ def _derive_bill_status(bill: dict) -> str:
         return "가결"
     if "부결" in rgs:
         return "부결"
+    if "철회" in rgs:
+        return "철회"
     for field in ("소관위처리결과", "법사위처리결과"):
         r = bill.get(field, "")
         if "철회" in r:

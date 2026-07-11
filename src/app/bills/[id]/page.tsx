@@ -14,6 +14,8 @@ const STATUS_STYLE: Record<string, string> = {
   '폐기':   'bg-slate-100 text-slate-500 border border-slate-200',
 }
 
+const OPINION_HIDDEN_STATUSES = new Set(['부결', '철회', '폐기', '가결'])
+
 const AI_ITEMS = [
   { label: '발의 이유',          key: 'ai_reason' },
   { label: '핵심 내용',          key: 'ai_content' },
@@ -32,6 +34,7 @@ export default async function BillDetailPage({
 
   const statusCls = STATUS_STYLE[bill.status ?? ''] ?? 'bg-slate-100 text-slate-500 border border-slate-200'
   const hasAi = bill.ai_reason || bill.ai_content || bill.ai_benefit || bill.ai_consideration
+  const showOpinion = !OPINION_HIDDEN_STATUSES.has(bill.status ?? '')
 
   return (
     <main className="max-w-2xl mx-auto px-4 pt-[116px] pb-20">
@@ -121,27 +124,56 @@ export default async function BillDetailPage({
       )}
 
       {/* 발의안 의견 남기기 */}
-      <section className="rounded-xl border border-slate-200 bg-slate-50 p-5 mb-6" id="opinion">
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="text-base font-bold text-slate-700">발의안 의견 남기기</h2>
-          <Link
-            href="/bills/opinion-guide"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-blue-500 underline underline-offset-2 flex-shrink-0"
-          >
-            도움말
-          </Link>
-        </div>
-        <p className="text-xs text-slate-400 mb-4">※ 의견은 본회의 심사 전까지만 남길 수 있습니다.</p>
+      {showOpinion && (
+        <section className="rounded-xl border border-slate-200 bg-slate-50 p-5 mb-6" id="opinion">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-base font-bold text-slate-700">발의안 의견 남기기</h2>
+            <Link
+              href="/bills/opinion-guide"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-500 underline underline-offset-2 flex-shrink-0"
+            >
+              도움말
+            </Link>
+          </div>
+          <p className="text-xs text-slate-400 mb-4">※ 의견은 본회의 심사 전까지만 남길 수 있습니다.</p>
 
-        {bill.detail_link && (
-          <div className="mb-6">
-            <h3 className="text-sm font-bold text-slate-600 mb-3">1. 국회의안정보시스템 이용하기</h3>
+          {bill.detail_link && (
+            <div className="mb-6">
+              <h3 className="text-sm font-bold text-slate-600 mb-3">1. 국회의안정보시스템 이용하기</h3>
+              <ol className="space-y-3 text-sm text-slate-600 mb-4">
+                {[
+                  '국회의안정보시스템에서 보기 클릭',
+                  '의안명 오른쪽 [입법예고중] 클릭',
+                  '의견 남기기',
+                ].map((step, i) => (
+                  <li key={i} className="flex items-center gap-3">
+                    <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs flex items-center justify-center flex-shrink-0 font-bold">
+                      {i + 1}
+                    </span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
+              <a
+                href={bill.detail_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full py-3.5 rounded-xl bg-blue-600 text-white text-sm font-semibold text-center hover:bg-blue-700 active:bg-blue-800 transition-colors"
+              >
+                국회의안정보시스템 바로가기
+              </a>
+            </div>
+          )}
+
+          <div>
+            <h3 className="text-sm font-bold text-slate-600 mb-3">2. 국회 입법예고 이용하기</h3>
             <ol className="space-y-3 text-sm text-slate-600 mb-4">
               {[
-                '국회의안정보시스템에서 보기 클릭',
-                '의안명 오른쪽 [입법예고중] 클릭',
+                '국회입법예고 사이트 접속',
+                '진행 중 입법예고 클릭',
+                '법률안명 검색',
                 '의견 남기기',
               ].map((step, i) => (
                 <li key={i} className="flex items-center gap-3">
@@ -153,43 +185,16 @@ export default async function BillDetailPage({
               ))}
             </ol>
             <a
-              href={bill.detail_link}
+              href="https://pal.assembly.go.kr/napal/main/main.do"
               target="_blank"
               rel="noopener noreferrer"
               className="block w-full py-3.5 rounded-xl bg-blue-600 text-white text-sm font-semibold text-center hover:bg-blue-700 active:bg-blue-800 transition-colors"
             >
-              국회의안정보시스템 바로가기
+              국회 입법예고 바로가기
             </a>
           </div>
-        )}
-
-        <div>
-          <h3 className="text-sm font-bold text-slate-600 mb-3">2. 국회 입법예고 이용하기</h3>
-          <ol className="space-y-3 text-sm text-slate-600 mb-4">
-            {[
-              '국회입법예고 사이트 접속',
-              '진행 중 입법예고 클릭',
-              '법률안명 검색',
-              '의견 남기기',
-            ].map((step, i) => (
-              <li key={i} className="flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs flex items-center justify-center flex-shrink-0 font-bold">
-                  {i + 1}
-                </span>
-                <span>{step}</span>
-              </li>
-            ))}
-          </ol>
-          <a
-            href="https://pal.assembly.go.kr/napal/main/main.do"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-full py-3.5 rounded-xl bg-blue-600 text-white text-sm font-semibold text-center hover:bg-blue-700 active:bg-blue-800 transition-colors"
-          >
-            국회 입법예고 바로가기
-          </a>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 진행 단계 */}
       <section className="mb-6">
