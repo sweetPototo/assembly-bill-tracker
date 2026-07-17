@@ -1,0 +1,34 @@
+name: Assembly Bills Sync
+
+on:
+  schedule:
+    # 매주 월~금 22:00 UTC = 한국시간(KST) 화~토 07:00
+    - cron: '0 22 * * 1-5'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ASSEMBLY_API_KEY: ${{ secrets.ASSEMBLY_API_KEY }}
+
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 의존성 설치
+        run: pip install -r scrapers/requirements.txt
+
+      - name: 국회 의안 동기화 (assembly_bill.py)
+        run: python scrapers/api/assembly_bill.py
+
+      - name: 발의안 일별 통계 집계 (assembly_initiative_statistic.py)
+        run: python scrapers/api/assembly_initiative_statistic.py
