@@ -33,3 +33,12 @@ scrapers/article/
 scrapers/utils/google_drive.py
 scrapers/rss_collector.py
 src/app/article/
+src/app/foreign/
+src/app/category/
+src/components/ArticleCard.tsx
+src/components/ArticleDetail.tsx
+src/components/ForeignView.tsx
+src/components/CategoryView.tsx
+src/components/KeywordTimeline.tsx
+src/components/WeeklyDatePicker.tsx
+src/components/CalendarPicker.tsx
