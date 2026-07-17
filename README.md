@@ -96,8 +96,8 @@ python api/assembly_initiative_statistic.py
 
 | 홈 대시보드 | 전체 발의안 목록 |
 |---|---|
-| ![홈 대시보드](docs/screenshots/home.png) | ![전체 발의안 목록](docs/screenshots/list.png) |
+| ![홈 대시보드](docs/screenshots/main.png) | ![전체 발의안 목록](docs/screenshots/list.png) |
 
 | 상세 페이지 — AI 요약 | 상세 페이지 — 의견 남기기 |
 |---|---|
-| ![상세 페이지 AI 요약](docs/screenshots/detail-summary.png) | ![상세 페이지 의견 남기기](docs/screenshots/detail-opinion.png) |
+| ![상세 페이지 AI 요약](docs/screenshots/detail1.png) | ![상세 페이지 의견 남기기](docs/screenshots/detail2.png) |
