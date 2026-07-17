@@ -22,3 +22,14 @@ tsconfig.tsbuildinfo
 
 # 기타
 .DS_Store
+
+# GitHub에는 올리지 않고 로컬에만 유지 (assembly 로직과 무관한 별도 스크립트/페이지)
+scrapers/api/fill_bill_category.py
+scrapers/api/mofa_briefing_api.py
+scrapers/api/mofa_news_api.py
+scrapers/api/mou_news_api.py
+scrapers/api/sync_june_bills.py
+scrapers/article/
+scrapers/utils/google_drive.py
+scrapers/rss_collector.py
+src/app/article/
