@@ -13,6 +13,7 @@ import os
 import sys
 import xml.etree.ElementTree as ET
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import count
 from dotenv import load_dotenv
 
@@ -22,7 +23,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from utils.ai_client import call_openai, ASSEMBLY_BILL
 from utils.supabase_client import (
     get_existing_bill_nos, get_pending_bills,
-    save_bill, update_bill_status,
+    save_bill, diff_bill_update, upsert_bill_updates,
 )
 
 BILL_LIST_URL    = "https://open.assembly.go.kr/portal/openapi/nzmimeepazxkubdpn"
@@ -175,22 +176,41 @@ def sync_new_bills(page_size: int = 20) -> int:
 # Track B — 진행중 법안 상태 갱신
 # ==============================================================================
 
+PENDING_UPDATE_WORKERS = 8   # 국회 API 부하를 고려한 동시 요청 수 제한
+
+
 def update_pending_bills() -> int:
     """
     DB에서 미확정 법안을 꺼내 3차 API로 상태·위원회 등 필드를 갱신.
     AI 재실행 없음.
+
+    조회(3차 API 호출 + 변경 여부 계산)는 ThreadPoolExecutor로 병렬 처리하고,
+    실제로 값이 달라진 row만 모아 한 번(청크 단위)의 upsert로 반영합니다.
     """
     print("\n[Track B] 진행중 법안 갱신 시작")
     pending = get_pending_bills()
     print(f"  진행중 법안: {len(pending)}건")
 
-    updated = 0
-    for i, row in enumerate(pending, start=1):
-        bill_id = row["bill_id"]
-        print(f"  [{i}/{len(pending)}] {bill_id} 조회 중...")
-        detail = fetch_bill_detail(bill_id)
-        if detail and update_bill_status(bill_id, detail, row):
-            updated += 1
+    to_write = []
+    done = 0
+    with ThreadPoolExecutor(max_workers=PENDING_UPDATE_WORKERS) as pool:
+        futures = {
+            pool.submit(fetch_bill_detail, row["bill_id"]): row
+            for row in pending
+        }
+        for future in as_completed(futures):
+            row = futures[future]
+            done += 1
+            print(f"  [{done}/{len(pending)}] {row['bill_id']} 조회 완료")
+            detail = future.result()
+            if not detail:
+                continue
+            changed_row = diff_bill_update(row["bill_id"], detail, row)
+            if changed_row:
+                to_write.append(changed_row)
+
+    print(f"  변경 감지: {len(to_write)}건 — upsert 진행")
+    updated = upsert_bill_updates(to_write)
 
     print(f"[Track B 완료] 갱신: {updated}건 / 조회: {len(pending)}건")
     return updated

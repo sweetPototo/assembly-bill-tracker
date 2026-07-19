@@ -128,6 +128,7 @@ def _to_date(s: str) -> str | None:
 
 
 def _derive_bill_status(bill: dict) -> str:
+    """처리 결과 정규화."""
     if bill.get("공포일"):
         return "공포"
     rgs = bill.get("본회의심의결과", "")
@@ -164,7 +165,7 @@ def get_existing_bill_nos(bill_nos: list[str]) -> set[str]:
         return set()
 
 
-# update_bill_status()가 갱신하는 컬럼과 동일 — 변경 여부 비교에 사용
+# _derive_update_fields()가 갱신하는 컬럼과 동일 — 변경 여부 비교에 사용
 _PENDING_BILL_COLUMNS = (
     "bill_id,bill_no,status,committee,"
     "jrcmit_cmmt_dt,jrcmit_prsnt_dt,jrcmit_proc_dt,jrcmit_proc_rslt,"
@@ -276,21 +277,15 @@ def update_bill_category(bill_id: str, category: str) -> bool:
         return False
 
 
-def update_bill_status(bill_id: str, detail: dict, existing: dict) -> bool:
-    """3차 API 결과로 진행 상태 및 위원회 관련 필드를 갱신합니다. AI 재실행 없음.
-
-    existing(get_pending_bills로 조회한 현재 DB 값)과 비교해 실제로 달라진
-    필드가 있을 때만 UPDATE를 실행합니다. 변경 없으면 쿼리를 아예 보내지 않습니다.
-    """
+def _derive_update_fields(detail: dict) -> dict:
+    """3차 API 결과를 DB 컬럼 형태로 변환. 순수 함수 — DB I/O 없음."""
     bill_for_status = {
         "공포일":         detail.get("PROM_DT", ""),
         "본회의심의결과": detail.get("RGS_CONF_RSLT", ""),
         "소관위처리결과": detail.get("JRCMIT_PROC_RSLT", ""),
         "법사위처리결과": detail.get("LAW_PROC_RSLT", ""),
     }
-    new_status = _derive_bill_status(bill_for_status)
-
-    data = {
+    return {
         "committee":        detail.get("JRCMIT_NM") or None,
         "jrcmit_cmmt_dt":   _to_date(detail.get("JRCMIT_CMMT_DT", "")),
         "jrcmit_prsnt_dt":  _to_date(detail.get("JRCMIT_PRSNT_DT", "")),
@@ -306,26 +301,38 @@ def update_bill_status(bill_id: str, detail: dict, existing: dict) -> bool:
         "prom_law_nm":      detail.get("PROM_LAW_NM") or None,
         "prom_dt":          _to_date(detail.get("PROM_DT", "")),
         "prom_no":          detail.get("PROM_NO") or None,
-        "status":           new_status,
+        "status":           _derive_bill_status(bill_for_status),
     }
 
-    changed = {k: v for k, v in data.items() if existing.get(k) != v}
-    if not changed:
-        print(f"  [Supabase] 변경 없음: {bill_id}")
-        return False
 
-    try:
-        result = (
-            _get_client()
-            .table("bills")
-            .update(changed)
-            .eq("bill_id", bill_id)
-            .execute()
-        )
-        if result.data:
-            print(f"  [Supabase] 갱신 완료: {bill_id} → {new_status} ({', '.join(changed)})")
-            return True
-        return False
-    except Exception as e:
-        print(f"  [Supabase] 갱신 오류: {e}")
-        return False
+def diff_bill_update(bill_id: str, detail: dict, existing: dict) -> dict | None:
+    """existing(get_pending_bills로 조회한 현재 DB 값)과 비교해 달라진 필드가
+    있으면 bill_id를 포함한 전체 row dict를, 없으면 None을 반환합니다.
+    DB I/O 없음 — ThreadPoolExecutor 등에서 병렬로 호출해도 안전합니다.
+    """
+    data = _derive_update_fields(detail)
+    if all(existing.get(k) == v for k, v in data.items()):
+        return None
+    return {"bill_id": bill_id, **data}
+
+
+_UPSERT_CHUNK_SIZE = 500
+
+
+def upsert_bill_updates(rows: list[dict]) -> int:
+    """변경된 row들을 청크 단위로 묶어 upsert. 성공적으로 반영된 row 수 반환."""
+    if not rows:
+        return 0
+
+    total = 0
+    client = _get_client()
+    for i in range(0, len(rows), _UPSERT_CHUNK_SIZE):
+        chunk = rows[i:i + _UPSERT_CHUNK_SIZE]
+        try:
+            result = client.table("bills").upsert(chunk, on_conflict="bill_id").execute()
+            n = len(result.data or [])
+            total += n
+            print(f"  [Supabase] 갱신 완료: {n}건 (청크 {i // _UPSERT_CHUNK_SIZE + 1})")
+        except Exception as e:
+            print(f"  [Supabase] 갱신 오류 (청크 {i // _UPSERT_CHUNK_SIZE + 1}): {e}")
+    return total
