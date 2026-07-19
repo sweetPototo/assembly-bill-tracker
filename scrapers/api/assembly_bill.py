@@ -189,10 +189,10 @@ def update_pending_bills() -> int:
         bill_id = row["bill_id"]
         print(f"  [{i}/{len(pending)}] {bill_id} 조회 중...")
         detail = fetch_bill_detail(bill_id)
-        if detail and update_bill_status(bill_id, detail):
+        if detail and update_bill_status(bill_id, detail, row):
             updated += 1
 
-    print(f"[Track B 완료] 갱신: {updated}건")
+    print(f"[Track B 완료] 갱신: {updated}건 / 조회: {len(pending)}건")
     return updated
 
 

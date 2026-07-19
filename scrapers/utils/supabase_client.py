@@ -164,13 +164,23 @@ def get_existing_bill_nos(bill_nos: list[str]) -> set[str]:
         return set()
 
 
+# update_bill_status()가 갱신하는 컬럼과 동일 — 변경 여부 비교에 사용
+_PENDING_BILL_COLUMNS = (
+    "bill_id,bill_no,status,committee,"
+    "jrcmit_cmmt_dt,jrcmit_prsnt_dt,jrcmit_proc_dt,jrcmit_proc_rslt,"
+    "law_cmmt_dt,law_prsnt_dt,law_proc_dt,law_proc_rslt,"
+    "rgs_prsnt_dt,rgs_rsln_dt,rgs_conf_rslt,"
+    "prom_law_nm,prom_dt,prom_no"
+)
+
+
 def get_pending_bills() -> list[dict]:
-    """status가 확정되지 않은 법안의 bill_id, bill_no 목록 반환."""
+    """status가 확정되지 않은 법안 목록 반환 (변경 여부 비교를 위해 갱신 대상 컬럼 전체 포함)."""
     try:
         result = (
             _get_client()
             .table("bills")
-            .select("bill_id,bill_no")
+            .select(_PENDING_BILL_COLUMNS)
             .not_.in_("status", list(FINAL_BILL_STATUSES))
             .execute()
         )
@@ -266,8 +276,12 @@ def update_bill_category(bill_id: str, category: str) -> bool:
         return False
 
 
-def update_bill_status(bill_id: str, detail: dict) -> bool:
-    """3차 API 결과로 진행 상태 및 위원회 관련 필드를 갱신합니다. AI 재실행 없음."""
+def update_bill_status(bill_id: str, detail: dict, existing: dict) -> bool:
+    """3차 API 결과로 진행 상태 및 위원회 관련 필드를 갱신합니다. AI 재실행 없음.
+
+    existing(get_pending_bills로 조회한 현재 DB 값)과 비교해 실제로 달라진
+    필드가 있을 때만 UPDATE를 실행합니다. 변경 없으면 쿼리를 아예 보내지 않습니다.
+    """
     bill_for_status = {
         "공포일":         detail.get("PROM_DT", ""),
         "본회의심의결과": detail.get("RGS_CONF_RSLT", ""),
@@ -294,16 +308,22 @@ def update_bill_status(bill_id: str, detail: dict) -> bool:
         "prom_no":          detail.get("PROM_NO") or None,
         "status":           new_status,
     }
+
+    changed = {k: v for k, v in data.items() if existing.get(k) != v}
+    if not changed:
+        print(f"  [Supabase] 변경 없음: {bill_id}")
+        return False
+
     try:
         result = (
             _get_client()
             .table("bills")
-            .update(data)
+            .update(changed)
             .eq("bill_id", bill_id)
             .execute()
         )
         if result.data:
-            print(f"  [Supabase] 갱신 완료: {bill_id} → {new_status}")
+            print(f"  [Supabase] 갱신 완료: {bill_id} → {new_status} ({', '.join(changed)})")
             return True
         return False
     except Exception as e:
