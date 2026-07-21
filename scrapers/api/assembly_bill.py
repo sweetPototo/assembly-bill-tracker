@@ -16,6 +16,8 @@ import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import count
 from dotenv import load_dotenv
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
@@ -30,6 +32,18 @@ BILL_LIST_URL    = "https://open.assembly.go.kr/portal/openapi/nzmimeepazxkubdpn
 BILL_SUMMARY_URL = "https://open.assembly.go.kr/portal/openapi/BPMBILLSUMMARY"
 BILL_DETAIL_URL  = "https://open.assembly.go.kr/portal/openapi/BILLINFODETAIL"
 SERVICE_KEY      = os.environ.get("ASSEMBLY_API_KEY", "")
+
+# 국회 API가 일시적으로 타임아웃/오류를 반환해도 자동 재시도 (최대 3회, 지수 백오프)
+_retry = Retry(
+    total=3,
+    connect=3,
+    read=3,
+    backoff_factor=1,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["GET"],
+)
+_session = requests.Session()
+_session.mount("https://", HTTPAdapter(max_retries=_retry))
 
 
 # ==============================================================================
@@ -51,7 +65,7 @@ def parse_xml(xml_text: str) -> list[dict]:
 def fetch_bill_list(page: int, page_size: int) -> list[dict]:
     """1차 API: 22대 의안 목록 (최신순)."""
     try:
-        response = requests.get(BILL_LIST_URL, params={
+        response = _session.get(BILL_LIST_URL, params={
             "key": SERVICE_KEY, "type": "xml",
             "pIndex": page, "pSize": page_size, "age": 22,
         }, timeout=10)
@@ -68,7 +82,7 @@ def fetch_bill_list(page: int, page_size: int) -> list[dict]:
 def fetch_bill_summary(bill_no: str) -> str:
     """2차 API: BILL_NO로 제안이유 및 주요내용 조회."""
     try:
-        response = requests.get(BILL_SUMMARY_URL, params={
+        response = _session.get(BILL_SUMMARY_URL, params={
             "key": SERVICE_KEY, "type": "xml", "BILL_NO": bill_no,
         }, timeout=10)
         response.raise_for_status()
@@ -82,7 +96,7 @@ def fetch_bill_summary(bill_no: str) -> str:
 def fetch_bill_detail(bill_id: str) -> dict:
     """3차 API: BILL_ID로 의안 상세정보 조회."""
     try:
-        response = requests.get(BILL_DETAIL_URL, params={
+        response = _session.get(BILL_DETAIL_URL, params={
             "key": SERVICE_KEY, "type": "xml", "BILL_ID": bill_id,
         }, timeout=10)
         response.raise_for_status()
@@ -176,7 +190,7 @@ def sync_new_bills(page_size: int = 20) -> int:
 # Track B — 진행중 법안 상태 갱신
 # ==============================================================================
 
-PENDING_UPDATE_WORKERS = 8   # 국회 API 부하를 고려한 동시 요청 수 제한
+PENDING_UPDATE_WORKERS = 4   # 국회 API 부하를 고려한 동시 요청 수 제한
 
 
 def update_pending_bills() -> int:
