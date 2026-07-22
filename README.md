@@ -45,6 +45,53 @@ Next.js 웹 서비스 (src/)
 
 GitHub Actions가 매주 화~토 오전 위 파이프라인의 수집·갱신 단계를 자동 실행합니다.
 
+### 법안 동기화 흐름 — Track A / Track B (`scrapers/api/assembly_bill.py`)
+
+`sync_bills()`가 신규 법안 수집(Track A)을 먼저 실행한 뒤, 진행중 법안 갱신(Track B)을 실행합니다.
+
+**Track A — 신규 법안 수집** (`sync_new_bills`): 1차 API를 최신순으로 페이지 단위 순회하며, 신규 법안만 순차로 상세 수집·AI 요약 후 저장합니다.
+
+```mermaid
+flowchart LR
+    A1["fetch_bill_list(page)<br/>1차 API — 최신순 목록 조회"]
+    A2["get_existing_bill_nos()<br/>DB 조회 → 신규만 필터링"]
+    A3["신규 법안마다 순차 처리<br/>fetch_bill_summary() · 2차<br/>fetch_bill_detail() · 3차<br/>call_openai() · AI 요약/분류"]
+    A4["save_bill()<br/>DB insert"]
+
+    A1 --> A2 --> A3 --> A4
+    A4 -. "신규 0건 → 종료 · 그 외 → 다음 페이지" .-> A1
+
+    classDef api fill:#f7ecd9,stroke:#a8670e,color:#7a4d0a;
+    classDef db fill:#e3edf8,stroke:#2563a8,color:#1d4d80;
+    classDef ai fill:#efe6f8,stroke:#7548b0,color:#583a87;
+
+    class A1 api
+    class A2 db
+    class A3 ai
+    class A4 db
+```
+
+**Track B — 진행중 법안 갱신** (`update_pending_bills`): 미확정 법안 전체를 한 번에 조회한 뒤, 상세 재조회만 병렬로 처리하고 변경분만 반영합니다. (AI 재실행 없음)
+
+```mermaid
+flowchart LR
+    B1["get_pending_bills()<br/>DB 조회 (1회) — 미확정 법안 전체"]
+    B2{{"ThreadPoolExecutor(max_workers=8)<br/>fetch_bill_detail() 병렬 호출<br/>as_completed()로 먼저 끝난 순서 처리"}}
+    B3["diff_bill_update()<br/>기존 DB 값과 동일하면 skip<br/>다르면 변경 row 반환"]
+    B4["upsert_bill_updates()<br/>변경분만 500건 청크 upsert"]
+
+    B1 --> B2 --> B3 --> B4
+
+    classDef api fill:#f7ecd9,stroke:#a8670e,color:#7a4d0a;
+    classDef db fill:#e3edf8,stroke:#2563a8,color:#1d4d80;
+    classDef compute fill:#dff2ee,stroke:#12786c,color:#0b5349;
+
+    class B1 db
+    class B2 api
+    class B3 compute
+    class B4 db
+```
+
 ## 기술적으로 고민한 부분
 
 - **검색 성능** — 법률안명/요약 부분 검색(ILIKE)이 인덱스를 못 타는 문제를 `pg_trgm` GIN 인덱스로 해결하고, 카테고리 필터 + 날짜 정렬이 함께 쓰이는 조회 패턴에 맞춰 복합 인덱스를 설계
