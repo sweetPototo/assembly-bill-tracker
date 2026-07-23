@@ -2,14 +2,14 @@ import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
-import { fetchAssemblySeats, type ComparisonStats, type PeriodStats } from '@/lib/supabase'
+import { fetchAssemblySeats, type PeriodStats, PASSED_STATUSES, REJECTED_STATUSES, resolvedDateOrFilter } from '@/lib/supabase'
 import AssemblySeatChart from '@/components/AssemblySeatChart'
 import MonthlyStats from '@/components/MonthlyStats'
 import WeeklyBillChart, { type WeeklyStat } from '@/components/WeeklyBillChart'
 import TopViewedBills, { type TopViewedBill } from '@/components/TopViewedBills'
 
 
-async function fetchStats(): Promise<ComparisonStats> {
+async function fetchStats(): Promise<{ current: PeriodStats; start: string; end: string }> {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -17,43 +17,29 @@ async function fetchStats(): Promise<ComparisonStats> {
 
   const fmt = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-  const add = (d: Date, n: number) => { const r = new Date(d); r.setDate(r.getDate()+n); return r }
 
-  const yesterday = add(new Date(), -1)
-  const p1End   = fmt(yesterday)
-  const p1Start = fmt(add(yesterday, -6))   // 7 days ending yesterday
-  const p2End   = fmt(add(yesterday, -7))
-  const p2Start = fmt(add(yesterday, -13))  // preceding 7 days
+  const now = new Date()
+  const start = fmt(new Date(now.getFullYear(), now.getMonth(), 1))
+  const end   = fmt(new Date(now.getFullYear(), now.getMonth() + 1, 0))  // 이번 달 말일
 
   const base = () => supabase.from('bills').select('*', { count: 'exact', head: true })
-  const inRangeOr = (s: string, e: string, ...cols: string[]) =>
-    cols.map(c => `and(${c}.gte.${s},${c}.lte.${e})`).join(',')
 
   const [
-    { count: a1 }, { count: p1 }, { count: r1 },
-    { count: a2 }, { count: p2 }, { count: r2 },
+    { count: a }, { count: p }, { count: r },
   ] = await Promise.all([
-    base().eq('status', '진행중').gte('propose_dt', p1Start).lte('propose_dt', p1End),
-    base().in('status', ['가결', '공포']).or(inRangeOr(p1Start, p1End, 'rgs_rsln_dt', 'prom_dt')),
-    base().in('status', ['부결', '철회', '폐기']).or(inRangeOr(p1Start, p1End, 'rgs_rsln_dt', 'jrcmit_proc_dt')),
-    base().eq('status', '진행중').gte('propose_dt', p2Start).lte('propose_dt', p2End),
-    base().in('status', ['가결', '공포']).or(inRangeOr(p2Start, p2End, 'rgs_rsln_dt', 'prom_dt')),
-    base().in('status', ['부결', '철회', '폐기']).or(inRangeOr(p2Start, p2End, 'rgs_rsln_dt', 'jrcmit_proc_dt')),
+    base().eq('status', '진행중').gte('propose_dt', start).lte('propose_dt', end),
+    base().in('status', PASSED_STATUSES).or(resolvedDateOrFilter('passed', start, end)),
+    base().in('status', REJECTED_STATUSES).or(resolvedDateOrFilter('rejected', start, end)),
   ])
 
   const mk = (a: number, p: number, r: number): PeriodStats =>
     ({ active: a, passed: p, rejected: r, total: a + p + r })
 
-  return {
-    current: mk(a1 ?? 0, p1 ?? 0, r1 ?? 0),
-    previous: mk(a2 ?? 0, p2 ?? 0, r2 ?? 0),
-    currentStart: p1Start,
-    currentEnd: p1End,
-  }
+  return { current: mk(a ?? 0, p ?? 0, r ?? 0), start, end }
 }
 
 
-async function fetchWeeklyStats(): Promise<{ rows: WeeklyStat[]; hasLastWeek: boolean }> {
+async function fetchWeeklyStats(): Promise<{ rows: WeeklyStat[]; hasLastWeek: boolean; dateFrom: string; dateTo: string }> {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -93,7 +79,7 @@ async function fetchWeeklyStats(): Promise<{ rows: WeeklyStat[]; hasLastWeek: bo
     }))
     .sort((a, b) => b.count - a.count)
 
-  return { rows: result, hasLastWeek }
+  return { rows: result, hasLastWeek, dateFrom: recentStart, dateTo: recentEnd }
 }
 
 async function fetchTopViewed(): Promise<TopViewedBill[]> {
@@ -136,7 +122,6 @@ const STATUS_STYLE: Record<string, string> = {
 
 export default async function BillsHomePage() {
   const [stats, recent, seats, weekly, topViewed] = await Promise.all([fetchStats(), fetchRecent(), fetchAssemblySeats(), fetchWeeklyStats(), fetchTopViewed()])
-  const { currentStart: recentStart, currentEnd: recentEnd } = stats
 
   return (
     <main className="max-w-3xl mx-auto px-4 pt-[116px] pb-16">
@@ -157,7 +142,7 @@ export default async function BillsHomePage() {
 
       {/* 카테고리별 주간 발의 현황 */}
       <div className="rounded-xl border border-slate-100 bg-white p-4 mb-8">
-        <WeeklyBillChart rows={weekly.rows} hasLastWeek={weekly.hasLastWeek} dateFrom={recentStart} dateTo={recentEnd} />
+        <WeeklyBillChart rows={weekly.rows} hasLastWeek={weekly.hasLastWeek} dateFrom={weekly.dateFrom} dateTo={weekly.dateTo} />
       </div>
 
       {/* 최근 발의안 */}

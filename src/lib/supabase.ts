@@ -102,10 +102,6 @@ export async function fetchAssemblySeats(): Promise<AssemblySeat[]> {
 }
 
 export type PeriodStats = { total: number; active: number; passed: number; rejected: number }
-export type ComparisonStats = {
-  current: PeriodStats; previous: PeriodStats
-  currentStart: string; currentEnd: string
-}
 
 export const BILL_PAGE_SIZE = 10
 
@@ -148,6 +144,22 @@ export const BILL_CATEGORIES = [
 
 const CLOSED_STATUSES = ['가결', '부결', '철회', '공포', '폐기']
 
+// 상태별로 "확정된 날짜"가 기록되는 컬럼 — _derive_bill_status()(scrapers/utils/supabase_client.py)의
+// 판정 로직과 1:1로 대응해야 함. 카운트 집계(bills/page.tsx fetchStats)와 목록 필터(fetchBills)가
+// 반드시 이 상수를 함께 써서 같은 기준을 보게 한다.
+export const PASSED_STATUSES   = ['가결', '공포']
+export const REJECTED_STATUSES = ['부결', '철회', '폐기']
+const RESOLVED_DATE_COLUMNS: Record<'passed' | 'rejected', string[]> = {
+  passed:   ['rgs_rsln_dt', 'prom_dt'],                     // 본회의 가결 또는 공포
+  rejected: ['rgs_rsln_dt', 'jrcmit_proc_dt', 'law_proc_dt'], // 본회의 부결/철회, 소관위·법사위 철회/폐기
+}
+
+export function resolvedDateOrFilter(statusFilter: 'passed' | 'rejected', from: string, to: string): string {
+  return RESOLVED_DATE_COLUMNS[statusFilter]
+    .map(col => `and(${col}.gte.${from},${col}.lte.${to})`)
+    .join(',')
+}
+
 export async function fetchBills(
   from: number,
   filter: BillFilter = 'all',
@@ -173,16 +185,21 @@ export async function fetchBills(
     query = query.or(`rst_proposer.ilike.${p},publ_proposer.ilike.${p}`)
   }
 
-  const dateCol = search.dateField ?? 'propose_dt'
-  if (search.dateFrom) query = query.gte(dateCol, search.dateFrom)
-  if (search.dateTo)   query = query.lte(dateCol, search.dateTo)
-
   if (search.category?.length) query = query.in('category', search.category)
 
   if (search.statusFilter === 'passed')
-    query = query.in('status', ['가결', '공포'])
+    query = query.in('status', PASSED_STATUSES)
   else if (search.statusFilter === 'rejected')
-    query = query.in('status', ['부결', '철회', '폐기'])
+    query = query.in('status', REJECTED_STATUSES)
+
+  const dateCol = search.dateField ?? 'propose_dt'
+  if (dateCol === 'rgs_rsln_dt' && search.statusFilter && search.dateFrom && search.dateTo) {
+    // "종료일" 기준 + 가결/부결 필터: 카운트 집계와 동일하게 상태별 확정 날짜 컬럼을 OR로 묶어서 본다
+    query = query.or(resolvedDateOrFilter(search.statusFilter, search.dateFrom, search.dateTo))
+  } else {
+    if (search.dateFrom) query = query.gte(dateCol, search.dateFrom)
+    if (search.dateTo)   query = query.lte(dateCol, search.dateTo)
+  }
 
   const { data, error } = await query
     .order('propose_dt', { ascending: false, nullsFirst: false })
