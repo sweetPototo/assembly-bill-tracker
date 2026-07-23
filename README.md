@@ -92,6 +92,12 @@ flowchart LR
     class B4 db
 ```
 
+### ERD — 국회 법률안 관련 테이블
+
+`bills` · `bills_weekly_statistics` · `assembly_seat` 3개 테이블의 실제 운영 스키마입니다. FOREIGN KEY 제약은 없고, 테이블 간 연결은 `category` 같은 텍스트 값 일치로만 이뤄지는 애플리케이션 레벨 관계입니다.
+
+![ERD - 국회 법률안 관련 테이블](docs/screenshots/erd.png)
+
 ## 기술적으로 고민한 부분
 
 - **검색 성능** — 법률안명/요약 부분 검색(ILIKE)이 인덱스를 못 타는 문제를 `pg_trgm` GIN 인덱스로 해결하고, 카테고리 필터 + 날짜 정렬이 함께 쓰이는 조회 패턴에 맞춰 복합 인덱스를 설계
